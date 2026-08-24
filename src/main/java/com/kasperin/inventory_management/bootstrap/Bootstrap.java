@@ -1,4 +1,3 @@
-/*
 package com.kasperin.inventory_management.bootstrap;
 
 import com.kasperin.inventory_management.domain.Items.FruitAndVege;
@@ -469,4 +468,4 @@ public class Bootstrap implements ApplicationListener<ContextRefreshedEvent> {
 
 
 }
-*/
+

@@ -17,10 +17,15 @@ public class PurchaseOrderResourceAssembler
 
     @Override
     public EntityModel<PurchaseOrder> toModel(PurchaseOrder entity) {
-        return new EntityModel<PurchaseOrder>(entity,
-                linkTo(PurchaseOrderController.class).slash(entity.getId()).withSelfRel(),
-                linkTo(PurchaseOrderController.class).withRel("purchase_orders"));
-    }
+    return EntityModel.of(
+            entity,
+            linkTo(PurchaseOrderController.class)
+                    .slash(entity.getId())
+                    .withSelfRel(),
+            linkTo(PurchaseOrderController.class)
+                    .withRel("purchase_orders")
+    );
+}
 
     @Override
     public CollectionModel<EntityModel<PurchaseOrder>> toCollectionModel(Iterable<? extends PurchaseOrder> entities) {

@@ -20,7 +20,7 @@ class FruitAndVegeBootStrapITest {
     void onApplicationEvent() {
        List<FruitAndVege> foo = fruitAndVegeRepository.findAll();
 
-       assertEquals(3, foo.size());
+       assertEquals(8, foo.size());
 
     }
 }
