@@ -1,0 +1,16 @@
+.git
+.gitignore
+.github
+.idea
+.vscode
+*.iml
+*.log
+.env
+.env.*
+target
+ai-specifications
+docs
+engineering-decisions
+presentation
+README.md
+LICENSE
