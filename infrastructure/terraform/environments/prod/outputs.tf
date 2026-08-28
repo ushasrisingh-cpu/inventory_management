@@ -1,0 +1,13 @@
+output "vpc_id" { value = module.infrastructure.vpc_id }
+output "public_subnet_ids" { value = module.infrastructure.public_subnet_ids }
+output "private_subnet_ids" { value = module.infrastructure.private_subnet_ids }
+output "ecr_repository_url" { value = module.infrastructure.ecr_repository_url }
+output "eks_cluster_name" { value = module.infrastructure.eks_cluster_name }
+output "eks_cluster_endpoint" { value = module.infrastructure.eks_cluster_endpoint }
+output "eks_oidc_provider_arn" { value = module.infrastructure.eks_oidc_provider_arn }
+output "aws_load_balancer_controller_role_arn" { value = module.infrastructure.aws_load_balancer_controller_role_arn }
+output "rds_endpoint" { value = module.infrastructure.rds_endpoint }
+output "alb_security_group_id" { value = module.infrastructure.alb_security_group_id }
+output "eks_node_security_group_id" { value = module.infrastructure.eks_node_security_group_id }
+output "rds_security_group_id" { value = module.infrastructure.rds_security_group_id }
+output "github_actions_role_arn" { value = module.infrastructure.github_actions_role_arn }

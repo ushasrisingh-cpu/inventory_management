@@ -1,0 +1,24 @@
+aws_region              = "us-east-1"
+project_name            = "inventory-management"
+environment             = "dev"
+vpc_cidr                = "10.20.0.0/16"
+availability_zones      = ["us-east-1a", "us-east-1b"]
+public_subnet_cidrs     = ["10.20.1.0/24", "10.20.2.0/24"]
+private_subnet_cidrs    = ["10.20.11.0/24", "10.20.12.0/24"]
+ecr_repository_name     = "inventory-management"
+eks_cluster_name        = "inventory-management-dev"
+eks_kubernetes_version  = "1.29"
+eks_node_instance_types = ["t3.small"]
+eks_node_desired_size   = 2
+eks_node_min_size       = 1
+eks_node_max_size       = 3
+rds_instance_class      = "db.t3.micro"
+rds_database_name       = "inventory"
+rds_username            = "inventory_admin"
+# Supply this outside source control, for example with TF_VAR_rds_password.
+# rds_password = "replace-me"
+
+# Enable only after configuring the repository trust boundary.
+# enable_github_oidc = true
+# github_repository  = "owner/repository"
+# github_branch      = "master"

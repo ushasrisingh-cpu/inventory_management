@@ -1,0 +1,12 @@
+variable "project_name" { type = string }
+variable "environment" { type = string }
+variable "vpc_cidr" { type = string }
+variable "availability_zones" { type = list(string) }
+variable "public_subnet_cidrs" { type = list(string) }
+variable "private_subnet_cidrs" { type = list(string) }
+variable "eks_cluster_name" { type = string }
+variable "nat_gateway_strategy" { type = string }
+variable "enable_flow_logs" { type = bool }
+variable "log_retention_days" { type = number }
+variable "flow_logs_kms_key_arn" { type = string }
+variable "tags" { type = map(string) }
