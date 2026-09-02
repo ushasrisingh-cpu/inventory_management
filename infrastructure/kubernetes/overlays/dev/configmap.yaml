@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-management-config
+data:
+  SPRING_PROFILES_ACTIVE: dev
+  SPRING_DATASOURCE_URL: jdbc:mysql://rds-dev-hostname.invalid:3306/inventory

@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: inventory-prod
+
+resources:
+  - namespace.yaml
+  - ../../base
+  - configmap.yaml
+  - ingress.yaml
+
+images:
+  - name: inventory-management
+    newName: AWS_ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com/inventory-management
+    newTag: PROD_GIT_COMMIT_SHA
+
+patches:
+  - target:
+      kind: Deployment
+      name: inventory-management
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: SPRING_PROFILES_ACTIVE
+          valueFrom:
+            configMapKeyRef:
+              name: inventory-management-config
+              key: SPRING_PROFILES_ACTIVE
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: inventory-management-config
+              key: SPRING_DATASOURCE_URL

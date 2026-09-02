@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-management
+  labels:
+    app: inventory-management
+spec:
+  type: ClusterIP
+  selector:
+    app: inventory-management
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
