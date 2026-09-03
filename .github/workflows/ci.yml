@@ -1,0 +1,227 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "11"
+  IMAGE_NAME: inventory-management
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  maven-tests:
+    name: Maven tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 11 with Maven cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Run Maven tests
+        run: mvn -B test
+
+  maven-package:
+    name: Maven package/build
+    needs: maven-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 11 with Maven cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Build packaged JAR
+        run: mvn -B package -DskipTests
+
+      - name: Upload packaged JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory-management-jar
+          path: target/inventory_management-0.0.1-SNAPSHOT.jar
+          if-no-files-found: error
+
+  sonar-analysis:
+    name: SonarQube/SonarCloud analysis
+    needs: maven-package
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 11 with Maven cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Run Sonar analysis
+        if: ${{ env.SONAR_TOKEN != '' }}
+        env:
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+        run: >-
+          mvn -B verify sonar:sonar
+          -Dsonar.host.url="${SONAR_HOST_URL}"
+          -Dsonar.projectKey="${SONAR_PROJECT_KEY}"
+          -Dsonar.organization="${SONAR_ORGANIZATION}"
+          -Dsonar.token="${SONAR_TOKEN}"
+
+  gitleaks:
+    name: Gitleaks secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | sh -s -- -b "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Scan repository for secrets
+        run: gitleaks dir . --no-banner --redact
+
+  terraform-validation:
+    name: Terraform formatting and validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Initialize reusable root without backend
+        run: terraform init -backend=false
+
+      - name: Validate reusable root
+        run: terraform validate
+
+      - name: Initialize dev without backend
+        working-directory: infrastructure/terraform/environments/dev
+        run: terraform init -backend=false
+
+      - name: Validate dev
+        working-directory: infrastructure/terraform/environments/dev
+        run: terraform validate
+
+      - name: Initialize prod without backend
+        working-directory: infrastructure/terraform/environments/prod
+        run: terraform init -backend=false
+
+      - name: Validate prod
+        working-directory: infrastructure/terraform/environments/prod
+        run: terraform validate
+
+  checkov-terraform:
+    name: Checkov Terraform scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      # Accepted findings:
+      # - EKS API is private by default; Checkov cannot fully evaluate the variable.
+      # - Dev intentionally uses shorter log retention and lower-cost RDS settings.
+      # - Dev permits HTTP; prod redirects HTTP to HTTPS.
+      # - Security groups are connected through module outputs and later ALB resources.
+      - name: Run Checkov on Terraform
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infrastructure/terraform
+          framework: terraform
+          quiet: true
+          compact: true
+          skip_check: >-
+            CKV_AWS_38,CKV_AWS_338,CKV_AWS_260,
+            CKV_AWS_118,CKV_AWS_353,CKV_AWS_293,
+            CKV_AWS_129,CKV_AWS_157,CKV2_AWS_5
+
+  checkov-kubernetes:
+    name: Checkov rendered Kubernetes scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Render dev and prod overlays
+        run: |
+          mkdir -p "$RUNNER_TEMP/rendered"
+          kubectl kustomize infrastructure/kubernetes/overlays/dev > "$RUNNER_TEMP/rendered/dev.yaml"
+          kubectl kustomize infrastructure/kubernetes/overlays/prod > "$RUNNER_TEMP/rendered/prod.yaml"
+
+      - name: Install Checkov
+        run: python -m pip install --disable-pip-version-check checkov
+
+      # CKV_K8S_35 is accepted because the app contract uses Secret env refs.
+      # CKV_K8S_43 is accepted until CI can replace placeholders with pushed ECR digests.
+      - name: Scan rendered overlays
+        run: >-
+          checkov -f "$RUNNER_TEMP/rendered/dev.yaml" -f "$RUNNER_TEMP/rendered/prod.yaml"
+          --skip-check CKV_K8S_35,CKV_K8S_43
+
+  docker-build:
+    name: Docker image build
+    needs: maven-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build immutable local image
+        run: docker build --tag "${IMAGE_NAME}:${IMAGE_TAG}" .
+
+  trivy-image:
+    name: Trivy Docker image scan
+    needs: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build immutable local image for scanning
+        run: docker build --tag "${IMAGE_NAME}:${IMAGE_TAG}" .
+
+      - name: Scan fixable high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
