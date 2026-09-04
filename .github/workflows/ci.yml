@@ -84,7 +84,7 @@ jobs:
           SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
           SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
         run: >-
-          mvn -B verify sonar:sonar
+          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:5.7.0.6970:sonar
           -Dsonar.host.url="${SONAR_HOST_URL}"
           -Dsonar.projectKey="${SONAR_PROJECT_KEY}"
           -Dsonar.organization="${SONAR_ORGANIZATION}"
@@ -99,13 +99,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Gitleaks
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | sh -s -- -b "$RUNNER_TEMP/bin"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-
       - name: Scan repository for secrets
-        run: gitleaks dir . --no-banner --redact
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   terraform-validation:
     name: Terraform formatting and validation
@@ -218,10 +215,11 @@ jobs:
         run: docker build --tag "${IMAGE_NAME}:${IMAGE_TAG}" .
 
       - name: Scan fixable high and critical vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
           format: table
+          trivyignores: .trivyignore
