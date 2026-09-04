@@ -1,61 +1,30 @@
 package com.kasperin.inventory_management.config;
 
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.License;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.hateoas.client.LinkDiscoverer;
-import org.springframework.hateoas.client.LinkDiscoverers;
-import org.springframework.hateoas.mediatype.collectionjson.CollectionJsonLinkDiscoverer;
-import org.springframework.plugin.core.SimplePluginRegistry;
-import springfox.documentation.builders.PathSelectors;
-import springfox.documentation.builders.RequestHandlerSelectors;
-import springfox.documentation.service.ApiInfo;
-import springfox.documentation.service.Contact;
-import springfox.documentation.spi.DocumentationType;
-import springfox.documentation.spring.web.plugins.Docket;
-import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
-import java.util.ArrayList;
-import java.util.List;
-
-
-@EnableSwagger2
 @Configuration
 public class SwaggerConfig {
 
     @Bean
-    public LinkDiscoverers discoverers() {
-        List<LinkDiscoverer> plugins = new ArrayList<>();
-        plugins.add(new CollectionJsonLinkDiscoverer());
-        return new LinkDiscoverers(SimplePluginRegistry.create(plugins));
-
-    }
-
-    @Bean
-    public Docket api(){
-        return new Docket(DocumentationType.SWAGGER_2)
-                .select()
-                .apis(RequestHandlerSelectors.any())
-                .paths(PathSelectors.any())
-                .build()
-                .pathMapping("/")
-                .apiInfo(metaData());
-    }
-
-    private ApiInfo metaData(){
-
-        Contact contact = new Contact("Vaughn Nze",
-                "http://10.1.3.232:8080/swagger-ui.html#/",
-                "vaughnnze@gmail.com");
-
-        return new ApiInfo(
-                "Inventory Management System",
-                "This is an inventory management system that exercises RESTful API",
-                "1.0",
-                "Terms of Service: ",
-                contact,
-                "MIT License",
-                "https://opensource.org/licenses/MIT",
-                new ArrayList<>());
+    public OpenAPI inventoryManagementOpenAPI() {
+    return new OpenAPI()
+        .info(new Info()
+            .title("Inventory Management System")
+            .description("This is an inventory management system that exercises RESTful API")
+            .version("1.0")
+            .termsOfService("Terms of Service: ")
+            .contact(new Contact()
+                .name("Vaughn Nze")
+                .url("http://10.1.3.232:8080/swagger-ui.html#/")
+                .email("vaughnnze@gmail.com"))
+            .license(new License()
+                .name("MIT License")
+                .url("https://opensource.org/licenses/MIT")));
     }
 
 }

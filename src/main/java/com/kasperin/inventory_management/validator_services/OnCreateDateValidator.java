@@ -2,8 +2,8 @@ package com.kasperin.inventory_management.validator_services;
 
 import com.kasperin.inventory_management.domain.Items.ProcessedFood;
 
-import javax.validation.ConstraintValidator;
-import javax.validation.ConstraintValidatorContext;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
 import java.time.LocalDate;
 
 //@SupportedValidationTarget({ValidationTarget.ANNOTATED_ELEMENT})

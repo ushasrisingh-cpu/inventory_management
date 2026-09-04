@@ -2,7 +2,7 @@ package com.kasperin.inventory_management.services.customerServices;
 
 import com.kasperin.inventory_management.domain.customer.Member;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Optional;
 

@@ -6,12 +6,25 @@ import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
 
 @Mapper
-public interface FruitAndVegeMapper {
+public abstract class FruitAndVegeMapper {
 
-    FruitAndVegeMapper INSTANCE = Mappers.getMapper(FruitAndVegeMapper.class);
+        public static final FruitAndVegeMapper INSTANCE =
+            Mappers.getMapper(FruitAndVegeMapper.class);
 
-    FruitAndVegeDTO fruitAndVegeToFruitAndVegeDTO(FruitAndVege fruitAndVege);
+    public FruitAndVegeDTO fruitAndVegeToFruitAndVegeDTO(FruitAndVege fruitAndVege) {
+        if (fruitAndVege == null) {
+            return null;
+        }
 
-    FruitAndVege fruitAndVegeDTOtoFruitAndVege(FruitAndVegeDTO fruitAndVegeDTO);
+        FruitAndVegeDTO fruitAndVegeDTO = new FruitAndVegeDTO();
+        fruitAndVegeDTO.setId(fruitAndVege.getId());
+        fruitAndVegeDTO.setName(fruitAndVege.getName());
+        fruitAndVegeDTO.setBarcode(fruitAndVege.getBarcode());
+        fruitAndVegeDTO.setPrice(fruitAndVege.getPrice());
+        fruitAndVegeDTO.setInStockQuantity(fruitAndVege.getInStockQuantity());
+        return fruitAndVegeDTO;
+    }
+
+    public abstract FruitAndVege fruitAndVegeDTOtoFruitAndVege(FruitAndVegeDTO fruitAndVegeDTO);
 
 }

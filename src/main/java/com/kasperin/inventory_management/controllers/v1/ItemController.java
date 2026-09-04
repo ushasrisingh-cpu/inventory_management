@@ -1,8 +1,6 @@
 package com.kasperin.inventory_management.controllers.v1;
 
 import com.kasperin.inventory_management.services.itemsServices.ItemService;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -10,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Api("All items API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ItemController.BASE_URL)
@@ -20,8 +17,6 @@ public class ItemController {
 
     private final ItemService itemService;
 
-    @ApiOperation(value = "This will get all items in stock in the inventory.",
-                  notes = "You can also query the inventory fo all items regardless of in stock status")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.OK)
     public List<Object> getAllItems(@RequestParam(value = "all", defaultValue = "") String all){

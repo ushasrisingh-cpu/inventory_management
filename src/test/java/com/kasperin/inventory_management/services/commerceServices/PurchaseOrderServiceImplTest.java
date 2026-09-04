@@ -10,7 +10,6 @@ import com.kasperin.inventory_management.repository.ItemsRepository.FruitAndVege
 import com.kasperin.inventory_management.repository.ItemsRepository.OrderedItemRepository;
 import com.kasperin.inventory_management.repository.ItemsRepository.StationaryRepository;
 import com.kasperin.inventory_management.repository.commerceRepository.PurchaseOrderRepository;
-import org.hibernate.criterion.Order;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import javax.transaction.Transactional;
+import jakarta.transaction.Transactional;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;

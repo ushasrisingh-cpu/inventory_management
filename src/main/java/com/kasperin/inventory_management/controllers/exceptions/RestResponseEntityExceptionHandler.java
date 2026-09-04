@@ -5,6 +5,7 @@ import com.kasperin.inventory_management.validator_services.Violation;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -16,8 +17,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import java.util.Date;
 
 @ControllerAdvice
@@ -75,7 +76,7 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
     @Override
     protected ResponseEntity<Object> handleHttpRequestMethodNotSupported(final HttpRequestMethodNotSupportedException ex,
                                                                          final HttpHeaders headers,
-                                                                         final HttpStatus status,
+                                                                         final HttpStatusCode status,
                                                                          final WebRequest request) {
         logger.info(ex.getClass().getName());
         //log.error("Method Not Allowed" + ex);
@@ -100,7 +101,7 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
     @Override
     protected ResponseEntity<Object> handleHttpMediaTypeNotSupported(final HttpMediaTypeNotSupportedException ex,
                                                                      final HttpHeaders headers,
-                                                                     final HttpStatus status,
+                                                                     final HttpStatusCode status,
                                                                      final WebRequest request) {
         logger.info(ex.getClass().getName());
         //
@@ -133,7 +134,7 @@ public class RestResponseEntityExceptionHandler extends ResponseEntityExceptionH
     @Override
     public ResponseEntity<Object> handleHttpMessageNotReadable(final HttpMessageNotReadableException ex,
                                                   final HttpHeaders headers,
-                                                  final HttpStatus status,
+                                                  final HttpStatusCode status,
                                                   final WebRequest request) {
 
         logger.info(ex.getClass().getName());

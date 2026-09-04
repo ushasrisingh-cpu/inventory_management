@@ -1,6 +1,6 @@
 package com.kasperin.inventory_management.validator_services;
 
-import javax.validation.Payload;
+import jakarta.validation.Payload;
 
 public class Severity {
     public interface Info extends Payload {

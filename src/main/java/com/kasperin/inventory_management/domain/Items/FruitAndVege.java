@@ -5,12 +5,11 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import javax.persistence.Entity;
+import jakarta.persistence.Entity;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
 @Entity
-//@PrimaryKeyJoinColumn(name = "item_id")
 @NoArgsConstructor
 public class FruitAndVege extends Item {
 

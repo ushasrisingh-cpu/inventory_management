@@ -6,14 +6,13 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 
-import javax.persistence.Entity;
+import jakarta.persistence.Entity;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
 @NoArgsConstructor
 //@RequiredArgsConstructor
 @Entity
-//@PrimaryKeyJoinColumn(name = "item_id")
 @Validated
 public class Stationary extends Item {
 

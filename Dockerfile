@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-11 AS build
+FROM maven:3.9-eclipse-temurin-17 AS build
 
 WORKDIR /build
 
@@ -7,7 +7,7 @@ COPY src ./src
 
 RUN mvn -B clean package -DskipTests
 
-FROM eclipse-temurin:11-jre-jammy
+FROM eclipse-temurin:17-jre-jammy
 
 RUN groupadd --system spring && useradd --system --gid spring --create-home spring
 

@@ -4,15 +4,13 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import javax.persistence.Entity;
-import javax.persistence.PrimaryKeyJoinColumn;
+import jakarta.persistence.Entity;
 
 @EqualsAndHashCode(callSuper = true)
 @SuppressWarnings("JpaDataSourceORMInspection")
 @Data
 @Entity
 @NoArgsConstructor
-@PrimaryKeyJoinColumn(name = "OrderedItem_id")
 public class OrderedStationaryItem extends OrderedItem{
     public OrderedStationaryItem(Stationary stationary){
         super.setName(stationary.getName());

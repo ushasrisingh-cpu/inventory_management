@@ -3,7 +3,7 @@ package com.kasperin.inventory_management.services.commerceServices;
 import com.kasperin.inventory_management.api.v1.model.PurchaseOrderItemDto;
 import com.kasperin.inventory_management.domain.commerce.PurchaseOrder;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;

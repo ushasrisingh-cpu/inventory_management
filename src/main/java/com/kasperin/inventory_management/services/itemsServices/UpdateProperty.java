@@ -2,7 +2,7 @@ package com.kasperin.inventory_management.services.itemsServices;
 
 import com.kasperin.inventory_management.domain.Items.Stationary;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 
 public class UpdateProperty {
     public void updateQty(@Valid Stationary stationaryPatch, Stationary stationaryInDB) {

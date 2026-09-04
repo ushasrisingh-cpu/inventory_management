@@ -1,0 +1,6 @@
+# Temporary accepted risk: these findings require Tomcat 10.1.58.
+# Maven Central could not resolve 10.1.58 when validated on 2026-09-04.
+# Remove these exceptions and upgrade tomcat.version when 10.1.58 is available.
+CVE-2026-65182
+CVE-2026-65905
+CVE-2026-68525

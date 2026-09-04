@@ -3,7 +3,7 @@ package com.kasperin.inventory_management.services.itemsServices;
 import com.kasperin.inventory_management.domain.Items.Stationary;
 import org.springframework.validation.annotation.Validated;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Optional;
 
