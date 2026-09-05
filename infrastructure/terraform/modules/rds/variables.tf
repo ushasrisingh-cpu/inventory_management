@@ -1,11 +1,11 @@
 variable "identifier" { type = string }
 variable "database_name" { type = string }
 variable "username" { type = string }
-variable "password" {
-  type      = string
-  sensitive = true
-}
 variable "instance_class" { type = string }
+variable "backup_retention_period" {
+  type    = number
+  default = 7
+}
 variable "engine_version" {
   type    = string
   default = null

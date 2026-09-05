@@ -8,20 +8,67 @@ variable "private_subnet_cidrs" { type = list(string) }
 variable "tags" { type = map(string) }
 variable "ecr_repository_name" { type = string }
 variable "ecr_image_retention_count" { type = number }
-variable "eks_cluster_name" { type = string }
-variable "eks_kubernetes_version" { type = string }
-variable "eks_node_instance_types" { type = list(string) }
-variable "eks_node_desired_size" { type = number }
-variable "eks_node_min_size" { type = number }
-variable "eks_node_max_size" { type = number }
 variable "enable_github_oidc" { type = bool }
 variable "github_repository" { type = string }
 variable "github_branch" { type = string }
+variable "rds_backup_retention_period" {
+  type    = number
+  default = 1
+}
 variable "rds_instance_class" { type = string }
 variable "rds_database_name" { type = string }
 variable "rds_username" { type = string }
-variable "rds_password" {
-  type      = string
-  sensitive = true
-}
 variable "rds_engine_version" { type = string }
+
+variable "enable_nat_gateway" { type = bool }
+variable "enable_flow_logs" { type = bool }
+variable "log_retention_days" { type = number }
+variable "flow_logs_kms_key_arn" {
+  type    = string
+  default = null
+}
+variable "ecr_kms_key_arn" { type = string }
+variable "ecs_container_name" { type = string }
+variable "ecs_image_tag" { type = string }
+variable "ecs_cpu" { type = number }
+variable "ecs_memory" { type = number }
+variable "ecs_desired_count" { type = number }
+variable "ecs_app_port" { type = number }
+variable "ecs_assign_public_ip" { type = bool }
+variable "ecs_log_retention_days" { type = number }
+variable "ecs_health_check_path" { type = string }
+variable "spring_profiles_active" { type = string }
+
+variable "rds_multi_az" {
+  type    = bool
+  default = false
+}
+variable "rds_deletion_protection" {
+  type    = bool
+  default = false
+}
+variable "rds_skip_final_snapshot" {
+  type    = bool
+  default = true
+}
+variable "rds_enable_performance_insights" {
+  type    = bool
+  default = false
+}
+variable "rds_enable_enhanced_monitoring" {
+  type    = bool
+  default = false
+}
+variable "rds_monitoring_interval" {
+  type    = number
+  default = 0
+}
+variable "rds_cloudwatch_log_exports" {
+  type    = list(string)
+  default = []
+}
+variable "rds_kms_key_arn" {
+  type    = string
+  default = null
+}
+variable "nat_gateway_strategy" { type = string }

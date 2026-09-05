@@ -3,50 +3,44 @@ data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-resource "aws_iam_role" "eks_cluster" {
-  name = "${var.project_name}-${var.environment}-eks-cluster"
+resource "aws_iam_role" "ecs_execution" {
+  name = "${var.project_name}-${var.environment}-ecs-execution"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { Service = "eks.amazonaws.com" }
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
       Action    = "sts:AssumeRole"
     }]
   })
   tags = var.tags
 }
 
-resource "aws_iam_role_policy_attachment" "eks_cluster" {
-  role       = aws_iam_role.eks_cluster.name
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEKSClusterPolicy"
-}
-
-resource "aws_iam_role" "eks_node" {
-  name = "${var.project_name}-${var.environment}-eks-node"
+resource "aws_iam_role" "ecs_task" {
+  name = "${var.project_name}-${var.environment}-ecs-task"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { Service = "ec2.amazonaws.com" }
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
       Action    = "sts:AssumeRole"
     }]
   })
   tags = var.tags
 }
 
-resource "aws_iam_role_policy_attachment" "eks_node_worker" {
-  role       = aws_iam_role.eks_node.name
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-}
-
-resource "aws_iam_role_policy_attachment" "eks_node_cni" {
-  role       = aws_iam_role.eks_node.name
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEKS_CNI_Policy"
-}
-
-resource "aws_iam_role_policy_attachment" "eks_node_ecr" {
-  role       = aws_iam_role.eks_node.name
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+resource "aws_iam_role_policy" "ecs_execution" {
+  role = aws_iam_role.ecs_execution.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage"], Resource = "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:repository/${var.ecr_repository_name}" },
+      { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*" },
+      { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "${var.log_group_arn}:*" },
+      { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = var.rds_secret_arn },
+      { Effect = "Allow", Action = ["kms:Decrypt", "kms:DescribeKey"], Resource = var.platform_kms_key_arn }
+    ]
+  })
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -104,16 +98,27 @@ resource "aws_iam_role_policy" "github_actions" {
         Resource = "*"
       },
       {
-        Sid      = "EksDescribeCluster"
+        Sid      = "EcsServiceDeployment"
         Effect   = "Allow"
-        Action   = ["eks:DescribeCluster"]
-        Resource = "arn:${data.aws_partition.current.partition}:eks:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:cluster/${var.eks_cluster_name}"
+        Action   = ["ecs:DescribeServices", "ecs:UpdateService"]
+        Resource = "arn:${data.aws_partition.current.partition}:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:service/${var.ecs_cluster_name}/${var.ecs_service_name}"
       },
       {
-        Sid      = "EksListClusters"
+        Sid      = "EcsTaskDefinition"
         Effect   = "Allow"
-        Action   = ["eks:ListClusters"]
+        Action   = ["ecs:DescribeTaskDefinition", "ecs:RegisterTaskDefinition"]
         Resource = "*"
+      },
+      {
+        Sid      = "PassOnlyEcsRoles"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
+        Resource = ["arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-ecs-execution", "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-${var.environment}-ecs-task"]
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ecs-tasks.amazonaws.com"
+          }
+        }
       }
     ]
   })

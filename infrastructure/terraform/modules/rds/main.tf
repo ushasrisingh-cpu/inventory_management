@@ -5,6 +5,11 @@ resource "aws_db_subnet_group" "this" {
 }
 
 resource "aws_db_instance" "this" {
+  #checkov:skip=CKV_AWS_118: Enhanced monitoring is disabled only in cost-controlled dev and enabled in prod.
+  #checkov:skip=CKV_AWS_353: Performance Insights is disabled only in cost-controlled dev and enabled in prod.
+  #checkov:skip=CKV_AWS_293: Deletion protection is disabled only for disposable dev and enabled in prod.
+  #checkov:skip=CKV_AWS_129: RDS log exports are environment-configurable and enabled in prod.
+  #checkov:skip=CKV_AWS_157: Dev is intentionally Single-AZ; prod enables Multi-AZ.
   identifier                          = var.identifier
   engine                              = "mysql"
   engine_version                      = var.engine_version
@@ -15,13 +20,14 @@ resource "aws_db_instance" "this" {
   storage_encrypted                   = true
   db_name                             = var.database_name
   username                            = var.username
-  password                            = var.password
+  manage_master_user_password         = true
+  master_user_secret_kms_key_id       = var.kms_key_arn
   port                                = 3306
   db_subnet_group_name                = aws_db_subnet_group.this.name
   vpc_security_group_ids              = [var.security_group_id]
   publicly_accessible                 = false
   multi_az                            = var.multi_az
-  backup_retention_period             = 7
+  backup_retention_period             = var.backup_retention_period
   deletion_protection                 = var.deletion_protection
   skip_final_snapshot                 = var.skip_final_snapshot
   final_snapshot_identifier           = var.skip_final_snapshot ? null : "${var.identifier}-final"

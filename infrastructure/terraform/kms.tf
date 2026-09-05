@@ -23,7 +23,10 @@ resource "aws_kms_key" "platform" {
         Resource  = "*"
         Condition = {
           ArnLike = {
-            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/vpc/${var.project_name}/${var.environment}/flow-logs"
+            "kms:EncryptionContext:aws:logs:arn" = [
+              "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/vpc/${var.project_name}/${var.environment}/flow-logs",
+              "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/ecs/${var.project_name}/${var.environment}"
+            ]
           }
         }
       }

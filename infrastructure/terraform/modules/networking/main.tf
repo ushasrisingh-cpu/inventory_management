@@ -53,12 +53,14 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_eip" "nat" {
+  count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
   tags   = merge(var.tags, { Name = "${var.project_name}-${var.environment}-nat-eip" })
 }
 
 resource "aws_nat_gateway" "this" {
-  allocation_id = aws_eip.nat.id
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
   subnet_id     = values(aws_subnet.public)[0].id
   depends_on    = [aws_internet_gateway.this]
   tags          = merge(var.tags, { Name = "${var.project_name}-${var.environment}-nat" })
@@ -66,9 +68,12 @@ resource "aws_nat_gateway" "this" {
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.this.id
+  dynamic "route" {
+    for_each = var.enable_nat_gateway ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.this[var.nat_gateway_strategy == "per_az" ? each.value : 0].id
+    }
   }
   tags = merge(var.tags, { Name = "${var.project_name}-${var.environment}-private-rt" })
 }
@@ -86,13 +91,15 @@ resource "aws_route_table_association" "private" {
 }
 
 resource "aws_security_group" "alb" {
+  #checkov:skip=CKV2_AWS_5: This security group is attached to the ALB in the sibling ECS module.
   name        = "${var.project_name}-${var.environment}-alb"
-  description = "Ingress boundary reserved for the Kubernetes AWS Load Balancer Controller."
+  description = "Ingress boundary reserved for the ECS application load balancer."
   vpc_id      = aws_vpc.this.id
   tags        = merge(var.tags, { Name = "${var.project_name}-${var.environment}-alb-sg" })
 }
 
 resource "aws_vpc_security_group_ingress_rule" "alb_http" {
+  #checkov:skip=CKV_AWS_260: Port 80 is the intentional public entry point for the temporary demo ALB.
   description       = "Allow public HTTP traffic to the ALB."
   security_group_id = aws_security_group.alb.id
   cidr_ipv4         = "0.0.0.0/0"
@@ -101,81 +108,25 @@ resource "aws_vpc_security_group_ingress_rule" "alb_http" {
   to_port           = 80
 }
 
-resource "aws_vpc_security_group_ingress_rule" "alb_https" {
-  description       = "Allow public HTTPS traffic to the ALB."
-  security_group_id = aws_security_group.alb.id
-  cidr_ipv4         = "0.0.0.0/0"
-  from_port         = 443
-  ip_protocol       = "tcp"
-  to_port           = 443
-}
 
-resource "aws_vpc_security_group_egress_rule" "alb_all" {
-  description       = "Allow all outbound traffic from the ALB."
-  security_group_id = aws_security_group.alb.id
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "-1"
-}
 
-resource "aws_security_group" "eks_cluster" {
-  name        = "${var.project_name}-${var.environment}-eks-cluster"
-  description = "EKS control plane security boundary."
+resource "aws_security_group" "task" {
+  #checkov:skip=CKV2_AWS_5: This security group is attached to the ECS service in the sibling ECS module.
+  name        = "${var.project_name}-${var.environment}-task"
+  description = "ECS task security boundary."
   vpc_id      = aws_vpc.this.id
-  tags        = merge(var.tags, { Name = "${var.project_name}-${var.environment}-eks-cluster-sg" })
+  tags        = merge(var.tags, { Name = "${var.project_name}-${var.environment}-task-sg" })
 }
-
-resource "aws_security_group" "eks_node" {
-  name        = "${var.project_name}-${var.environment}-eks-node"
-  description = "EKS worker node security boundary."
-  vpc_id      = aws_vpc.this.id
-  tags        = merge(var.tags, { Name = "${var.project_name}-${var.environment}-eks-node-sg" })
-}
-
-resource "aws_vpc_security_group_ingress_rule" "node_self" {
-  description                  = "Allow communication between EKS worker nodes."
-  security_group_id            = aws_security_group.eks_node.id
-  referenced_security_group_id = aws_security_group.eks_node.id
-  ip_protocol                  = "-1"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "node_cluster" {
-  description                  = "Allow EKS control plane traffic to worker nodes."
-  security_group_id            = aws_security_group.eks_node.id
-  referenced_security_group_id = aws_security_group.eks_cluster.id
-  ip_protocol                  = "-1"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "cluster_node" {
-  description                  = "Allow EKS worker nodes to reach the control plane."
-  security_group_id            = aws_security_group.eks_cluster.id
-  referenced_security_group_id = aws_security_group.eks_node.id
-  ip_protocol                  = "-1"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "node_alb" {
-  description                  = "Allow ALB traffic to the application on port 8080."
-  security_group_id            = aws_security_group.eks_node.id
+resource "aws_vpc_security_group_ingress_rule" "task_app" {
+  description                  = "Allow application traffic from the ALB to ECS tasks."
+  security_group_id            = aws_security_group.task.id
   referenced_security_group_id = aws_security_group.alb.id
   from_port                    = 8080
   ip_protocol                  = "tcp"
   to_port                      = 8080
 }
-
-resource "aws_vpc_security_group_egress_rule" "node_all" {
-  description       = "Allow outbound traffic from EKS worker nodes."
-  security_group_id = aws_security_group.eks_node.id
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "-1"
-}
-
-resource "aws_vpc_security_group_egress_rule" "cluster_all" {
-  description       = "Allow outbound traffic from the EKS control plane."
-  security_group_id = aws_security_group.eks_cluster.id
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "-1"
-}
-
 resource "aws_security_group" "rds" {
+  #checkov:skip=CKV2_AWS_5: This security group is attached to RDS in the sibling RDS module.
   name        = "${var.project_name}-${var.environment}-rds"
   description = "Private MySQL security boundary."
   vpc_id      = aws_vpc.this.id
@@ -183,17 +134,54 @@ resource "aws_security_group" "rds" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "rds_mysql" {
-  description                  = "Allow MySQL traffic from EKS worker nodes."
+  description                  = "Allow MySQL traffic from ECS tasks."
   security_group_id            = aws_security_group.rds.id
-  referenced_security_group_id = aws_security_group.eks_node.id
+  referenced_security_group_id = aws_security_group.task.id
   from_port                    = 3306
   ip_protocol                  = "tcp"
   to_port                      = 3306
 }
+resource "aws_vpc_security_group_egress_rule" "alb_to_task" {
+  description                  = "Allow the ALB to reach ECS tasks on the application port."
+  security_group_id            = aws_security_group.alb.id
+  referenced_security_group_id = aws_security_group.task.id
+  from_port                    = 8080
+  ip_protocol                  = "tcp"
+  to_port                      = 8080
+}
 
-resource "aws_vpc_security_group_egress_rule" "rds_all" {
-  description       = "Allow outbound traffic from RDS."
-  security_group_id = aws_security_group.rds.id
+resource "aws_vpc_security_group_egress_rule" "task_https" {
+  description       = "Allow ECS tasks to reach AWS APIs and pull images over HTTPS."
+  security_group_id = aws_security_group.task.id
   cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "-1"
+  from_port         = 443
+  ip_protocol       = "tcp"
+  to_port           = 443
+}
+
+resource "aws_vpc_security_group_egress_rule" "task_dns_udp" {
+  description       = "Allow ECS tasks to resolve DNS over UDP inside the VPC."
+  security_group_id = aws_security_group.task.id
+  cidr_ipv4         = var.vpc_cidr
+  from_port         = 53
+  ip_protocol       = "udp"
+  to_port           = 53
+}
+
+resource "aws_vpc_security_group_egress_rule" "task_dns_tcp" {
+  description       = "Allow ECS tasks to resolve DNS over TCP inside the VPC."
+  security_group_id = aws_security_group.task.id
+  cidr_ipv4         = var.vpc_cidr
+  from_port         = 53
+  ip_protocol       = "tcp"
+  to_port           = 53
+}
+
+resource "aws_vpc_security_group_egress_rule" "task_mysql" {
+  description                  = "Allow ECS tasks to connect to the private RDS database."
+  security_group_id            = aws_security_group.task.id
+  referenced_security_group_id = aws_security_group.rds.id
+  from_port                    = 3306
+  ip_protocol                  = "tcp"
+  to_port                      = 3306
 }
