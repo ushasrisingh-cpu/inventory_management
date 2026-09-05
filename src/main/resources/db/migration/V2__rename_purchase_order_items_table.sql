@@ -1,0 +1,1 @@
+RENAME TABLE purchase_order_ordered_item TO purchase_order_items;
