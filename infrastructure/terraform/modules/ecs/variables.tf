@@ -25,3 +25,32 @@ variable "rds_managed_secret_arn" { type = string }
 variable "spring_profiles_active" { type = string }
 variable "assign_public_ip" { type = bool }
 variable "tags" { type = map(string) }
+variable "enable_autoscaling" {
+  type    = bool
+  default = false
+}
+
+variable "autoscaling_min_capacity" {
+  type    = number
+  default = 1
+}
+
+variable "autoscaling_max_capacity" {
+  type    = number
+  default = 3
+}
+
+variable "autoscaling_target_cpu_utilization" {
+  type    = number
+  default = 60
+}
+
+variable "autoscaling_scale_in_cooldown" {
+  type    = number
+  default = 120
+}
+
+variable "autoscaling_scale_out_cooldown" {
+  type    = number
+  default = 60
+}

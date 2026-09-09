@@ -82,6 +82,35 @@ variable "ecs_desired_count" {
   type    = number
   default = 0
 }
+variable "ecs_enable_autoscaling" {
+  type    = bool
+  default = false
+}
+
+variable "ecs_autoscaling_min_capacity" {
+  type    = number
+  default = 1
+}
+
+variable "ecs_autoscaling_max_capacity" {
+  type    = number
+  default = 3
+}
+
+variable "ecs_autoscaling_target_cpu_utilization" {
+  type    = number
+  default = 60
+}
+
+variable "ecs_autoscaling_scale_in_cooldown" {
+  type    = number
+  default = 120
+}
+
+variable "ecs_autoscaling_scale_out_cooldown" {
+  type    = number
+  default = 60
+}
 variable "ecs_app_port" {
   type    = number
   default = 8080

@@ -120,6 +120,37 @@ resource "aws_ecs_service" "this" {
     container_name   = var.container_name
     container_port   = var.app_port
   }
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
   depends_on = [aws_lb_listener.http]
   tags       = var.tags
+}
+resource "aws_appautoscaling_target" "ecs_service" {
+  count = var.enable_autoscaling ? 1 : 0
+
+  min_capacity       = var.autoscaling_min_capacity
+  max_capacity       = var.autoscaling_max_capacity
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.this.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+resource "aws_appautoscaling_policy" "ecs_cpu" {
+  count = var.enable_autoscaling ? 1 : 0
+
+  name               = "${var.service_name}-cpu-target-tracking"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.ecs_service[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.ecs_service[0].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.ecs_service[0].service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    target_value       = var.autoscaling_target_cpu_utilization
+    scale_in_cooldown  = var.autoscaling_scale_in_cooldown
+    scale_out_cooldown = var.autoscaling_scale_out_cooldown
+
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+  }
 }

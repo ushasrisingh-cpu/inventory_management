@@ -7,3 +7,16 @@ Dev uses `ecs_desired_count = 0`, `enable_nat_gateway = false`, and public task 
 Root and environment outputs provide the ECR repository URL, ECS cluster and service names, ALB DNS name, RDS endpoint, sensitive managed secret ARN, GitHub role ARN, and platform KMS ARN. The ECS execution role is scoped to the ECR repository, ECS log group, managed RDS secret, and platform key.
 
 Use the Mumbai examples in `terraform.tfvars.example` and `environments/*/terraform.tfvars.example`. Do not run `terraform apply`, deploy, initialize, validate, or Checkov as part of this migration.
+## ECS service autoscaling
+
+The ECS service supports CPU target-tracking autoscaling. Development uses a
+minimum of one task and a maximum of two tasks; production uses a minimum of
+two tasks and a maximum of four tasks. The target average CPU utilization is
+60 percent.
+
+Development uses a two-stage bootstrap because the ECR repository is initially
+empty. First create the infrastructure with `ecs_desired_count = 0` and
+`ecs_enable_autoscaling = false`. After CI/CD pushes and deploys the first valid
+image, enable autoscaling and apply Terraform again. Terraform ignores later
+changes to the ECS desired count because that value is owned by CI/CD and
+Application Auto Scaling.

@@ -34,6 +34,35 @@ variable "ecs_image_tag" { type = string }
 variable "ecs_cpu" { type = number }
 variable "ecs_memory" { type = number }
 variable "ecs_desired_count" { type = number }
+variable "ecs_enable_autoscaling" {
+  type    = bool
+  default = true
+}
+
+variable "ecs_autoscaling_min_capacity" {
+  type    = number
+  default = 2
+}
+
+variable "ecs_autoscaling_max_capacity" {
+  type    = number
+  default = 4
+}
+
+variable "ecs_autoscaling_target_cpu_utilization" {
+  type    = number
+  default = 60
+}
+
+variable "ecs_autoscaling_scale_in_cooldown" {
+  type    = number
+  default = 120
+}
+
+variable "ecs_autoscaling_scale_out_cooldown" {
+  type    = number
+  default = 60
+}
 variable "ecs_app_port" { type = number }
 variable "ecs_assign_public_ip" { type = bool }
 variable "ecs_log_retention_days" { type = number }
