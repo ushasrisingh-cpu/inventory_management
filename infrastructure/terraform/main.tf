@@ -38,6 +38,7 @@ module "iam" {
 module "ecr" {
   source                = "./modules/ecr"
   repository_name       = var.ecr_repository_name
+  force_delete          = var.environment == "dev"
   image_retention_count = var.ecr_image_retention_count
   kms_key_arn           = coalesce(var.ecr_kms_key_arn, aws_kms_key.platform.arn)
   tags                  = local.common_tags

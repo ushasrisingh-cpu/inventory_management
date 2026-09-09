@@ -98,19 +98,20 @@ resource "aws_ecs_task_definition" "this" {
 data "aws_region" "current" {}
 
 resource "aws_ecs_service" "this" {
-  name                   = var.service_name
-  cluster                = aws_ecs_cluster.this.id
-  task_definition        = aws_ecs_task_definition.this.arn
-  desired_count          = var.desired_count
-  launch_type            = "FARGATE"
-  platform_version       = "LATEST"
-  enable_execute_command = false
+  name                              = var.service_name
+  cluster                           = aws_ecs_cluster.this.id
+  task_definition                   = aws_ecs_task_definition.this.arn
+  desired_count                     = var.desired_count
+  health_check_grace_period_seconds = 240
+  launch_type                       = "FARGATE"
+  platform_version                  = "LATEST"
+  enable_execute_command            = false
   deployment_circuit_breaker {
     enable   = true
     rollback = true
   }
   network_configuration {
-    subnets          = var.public_subnet_ids
+    subnets          = var.assign_public_ip ? var.public_subnet_ids : var.private_subnet_ids
     security_groups  = [var.task_security_group_id]
     assign_public_ip = var.assign_public_ip
   }
