@@ -229,49 +229,65 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService  {
     private boolean itemListIsEmptyOrNull(@RequestBody PurchaseOrderItemDto form) {
         return org.springframework.util.ObjectUtils.isEmpty(form.getItems());
     }
-
     private void saveOrderedItem(PurchaseOrder purchaseOrder, Map.Entry<String, Integer> entry) {
-        if (orderedItemExistsInStationaryRepository(entry)) saveStationaryOrderedIten(purchaseOrder, entry);
-        if (orderedItemExistsInFruitAndVegeRepository(entry)) saveFruitAndVegeOrderedItem(purchaseOrder, entry);
-        if (orderedItemExistsInProcessedFoodRepository(entry)) saveProcessedFoodOrderedItem(purchaseOrder, entry);
-        throw new RuntimeException("Item "+entry.getKey()+" was not found in inventory");
+        if (orderedItemExistsInStationaryRepository(entry)) {
+            saveStationaryOrderedIten(purchaseOrder, entry);
+            return;
+        }
+
+        if (orderedItemExistsInFruitAndVegeRepository(entry)) {
+            saveFruitAndVegeOrderedItem(purchaseOrder, entry);
+            return;
+        }
+
+        if (orderedItemExistsInProcessedFoodRepository(entry)) {
+            saveProcessedFoodOrderedItem(purchaseOrder, entry);
+            return;
+        }
+
+        throw new RuntimeException("Item " + entry.getKey() + " was not found in inventory");
     }
+
     private void saveStationaryOrderedIten(PurchaseOrder purchaseOrder, Map.Entry<String, Integer> entry) {
-        if(requestedStationaryAmountIsAvailable(entry)) {
-            if (requestedStationaryAmountIsEqualToOne(entry)) {
-                OrderedItem orderedItem = createOrderedStationaryItem(entry);
-                setOrderedItemAmount(entry, orderedItem);
-                updateInventoryStationaryItemInStockQty(entry);
-                purchaseOrder.addItem(orderedItem);
-            }
+        if (!requestedStationaryAmountIsAvailable(entry)) {
+            throw new RuntimeException("Requested Stationary item amount for: "
+                    + requestedStationaryName(entry)
+                    + " is not available. Available amount is "
+                    + getInventoryStationaryItemInStockQuantity(entry) + ".");
+        }
+
+        if (!requestedStationaryAmountIsEqualToOne(entry)) {
             throw new RuntimeException("Restriction: Requested Stationary amount for "
                     + requestedStationaryName(entry)
-                    +" is restricted to one. Stationary is limited to one quantity per item type per customer purchase order");
+                    + " is restricted to one.");
         }
-        throw new RuntimeException("Requested Stationary item amount for: "
-                + requestedStationaryName(entry)
-                +" is not available. Available amount is "
-                +getInventoryStationaryItemInStockQuantity(entry)+".");
+
+        OrderedItem orderedItem = createOrderedStationaryItem(entry);
+        setOrderedItemAmount(entry, orderedItem);
+        updateInventoryStationaryItemInStockQty(entry);
+        purchaseOrder.addItem(orderedItem);
     }
+
     private void saveFruitAndVegeOrderedItem(PurchaseOrder purchaseOrder, Map.Entry<String, Integer> entry) {
-        if (!requestedFruitAndVegeAmountIsAvailable(entry))
+        if (!requestedFruitAndVegeAmountIsAvailable(entry)) {
             throw new RuntimeException("Requested FruitAndVege item amount for: "
                     + requestedFruitAndVegeName(entry)
                     + " is not available. Available amount is "
                     + getInventoryFruitAndVegeItemInStockQuantity(entry) + ".");
-        else {
-            if (requestedFruitAndVegeAmountIsGreaterThanZero(entry)) {
-                OrderedItem orderedItem = createOrderedFruitAndVegeItem(entry);
-                setOrderedItemAmount(entry, orderedItem);
-                updateInventoryFruitAndVegeItemInStockQty(entry);
-                purchaseOrder.addItem(orderedItem);
-                recommendationService.createAssociation(new AssociationDto(orderedItem.getBarcode(),
-                        orderedItem.getBarcode()));
-            }
+        }
+
+        if (!requestedFruitAndVegeAmountIsGreaterThanZero(entry)) {
             throw new RuntimeException("Requested FruitAndVege amount for: "
                     + requestedFruitAndVegeName(entry)
-                    + " have to be greater than zero");
+                    + " has to be greater than zero.");
         }
+
+        OrderedItem orderedItem = createOrderedFruitAndVegeItem(entry);
+        setOrderedItemAmount(entry, orderedItem);
+        updateInventoryFruitAndVegeItemInStockQty(entry);
+        purchaseOrder.addItem(orderedItem);
+        recommendationService.createAssociation(
+                new AssociationDto(orderedItem.getBarcode(), orderedItem.getBarcode()));
     }
     private void saveProcessedFoodOrderedItem(PurchaseOrder purchaseOrder, Map.Entry<String, Integer> entry) {
         if(requestedProcessedFoodAmountIsAvailable(entry)) {

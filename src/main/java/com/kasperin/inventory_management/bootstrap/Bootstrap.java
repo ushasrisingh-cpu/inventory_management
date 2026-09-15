@@ -47,19 +47,19 @@ public class Bootstrap implements ApplicationListener<ContextRefreshedEvent> {
     @Override
     public void onApplicationEvent(ContextRefreshedEvent contextRefreshedEvent) {
 
-        List<FruitAndVege> savedFAV = fruitAndVegeRepository.saveAll(getFruitAndVeges());
+        List<FruitAndVege> savedFAV = fruitAndVegeRepository.count() == 0 ? fruitAndVegeRepository.saveAll(getFruitAndVeges()) : List.of();
         log.info("Produce saved: {}", savedFAV);
 
-        List<ProcessedFood> savedPF = processedFoodRepo.saveAll(getProcessedFood());
+        List<ProcessedFood> savedPF = processedFoodRepo.count() == 0 ? processedFoodRepo.saveAll(getProcessedFood()) : List.of();
         log.info("Processed foods saved: {}", savedPF);
 
-        List<Stationary> savedSt = stationaryRepository.saveAll(getStationary());
+        List<Stationary> savedSt = stationaryRepository.count() == 0 ? stationaryRepository.saveAll(getStationary()) : List.of();
         log.info("Stationary saved: {}", savedSt);
 
-        List<PurchaseOrder> savedPO = purchaseOrderRepository.saveAll(getPurchaseOrder());
+        List<PurchaseOrder> savedPO = purchaseOrderRepository.count() == 0 ? purchaseOrderRepository.saveAll(getPurchaseOrder()) : List.of();
         log.info("PurchaseOrder saved: {}", savedPO);
 
-        List<Member> savedMember= memberRepository.saveAll(getMembers());
+        List<Member> savedMember= memberRepository.count() == 0 ? memberRepository.saveAll(getMembers()) : List.of();
         log.info("Member saved: {}", savedMember);
 
 //loadInMemory();
