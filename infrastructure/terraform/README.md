@@ -17,18 +17,23 @@ two tasks and a maximum of four tasks. The target average CPU utilization is
 Development uses a two-stage bootstrap because the ECR repository is initially
 empty. First create the infrastructure with `ecs_desired_count = 0` and
 `ecs_enable_autoscaling = false`. After CI/CD pushes and deploys the first valid
-image, enable autoscaling and apply Terraform again.Terraform ignores later changes to the ECS desired count and task definition
+image, enable autoscaling and apply Terraform again. Terraform ignores later changes to the ECS desired count and task definition
 because those values are owned by Application Auto Scaling and CI/CD.
+
 
 
 ## S3 archives and database backups
 
-The stack creates a private, versioned, encrypted S3 archive bucket. CloudWatch
-logs are retained under `logs/` for 30 days, and portable SQL backups are
-retained under `backups/` for 90 days.
+`environments/archive` owns a persistent, private, versioned, encrypted S3
+bucket independently from the disposable dev and prod stacks. Create the
+archive stack first; destroying dev or prod does not remove retained objects.
 
-A one-off ECS Fargate task creates a MySQL dump from private RDS and uploads it
-with a dedicated least-privilege IAM role. It does not run continuously.
+Application and VPC logs are retained under `logs/` for 30 days. Portable SQL
+backups are retained under `backups/` for 90 days.
+
+The application stack defines a one-off ECS Fargate task that creates a MySQL
+dump from private RDS and uploads it with a dedicated least-privilege IAM role.
+It does not run continuously.
 
 See [`../../docs/S3_ARCHIVE_AND_BACKUP.md`](../../docs/S3_ARCHIVE_AND_BACKUP.md)
-for log export, database backup, and verification commands.
+for deployment order, log export, database backup, and verification commands.

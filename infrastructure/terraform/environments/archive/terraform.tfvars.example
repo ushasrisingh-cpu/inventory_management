@@ -1,0 +1,7 @@
+aws_region   = "ap-south-1"
+project_name = "inventory-management"
+environments = ["dev", "prod"]
+
+tags = {
+  Owner = "devsecops"
+}

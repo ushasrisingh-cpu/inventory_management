@@ -1,3 +1,14 @@
+data "aws_partition" "current" {}
+
+locals {
+  archive_bucket_name = substr(
+    lower("${var.project_name}-${data.aws_caller_identity.current.account_id}-${var.aws_region}-archive"),
+    0,
+    63
+  )
+  archive_bucket_arn = "arn:${data.aws_partition.current.partition}:s3:::${local.archive_bucket_name}"
+}
+
 resource "aws_iam_role" "database_backup" {
   name = "${var.project_name}-${var.environment}-database-backup"
 
@@ -29,13 +40,13 @@ resource "aws_iam_role_policy" "database_backup_s3" {
           "s3:PutObject",
           "s3:AbortMultipartUpload"
         ]
-        Resource = "${aws_s3_bucket.archive.arn}/backups/*"
+        Resource = "${local.archive_bucket_arn}/backups/*"
       },
       {
         Sid      = "ReadArchiveBucketLocation"
         Effect   = "Allow"
         Action   = "s3:GetBucketLocation"
-        Resource = aws_s3_bucket.archive.arn
+        Resource = local.archive_bucket_arn
       }
     ]
   })
@@ -124,7 +135,7 @@ resource "aws_ecs_task_definition" "database_backup" {
       environment = [
         {
           name  = "ARCHIVE_BUCKET"
-          value = aws_s3_bucket.archive.bucket
+          value = local.archive_bucket_name
         },
         {
           name  = "ENVIRONMENT"
@@ -162,4 +173,8 @@ output "database_backup_task_definition_arn" {
 
 output "task_security_group_id" {
   value = module.networking.task_security_group_id
+}
+
+output "archive_bucket_name" {
+  value = local.archive_bucket_name
 }

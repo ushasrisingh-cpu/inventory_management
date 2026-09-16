@@ -23,13 +23,20 @@ backup role can write only beneath `backups/`.
 
 ## Requirements
 
-The Terraform environment must already be deployed. The scripts use:
+The persistent archive stack must be deployed before the application environment. The scripts use:
 
 - AWS profile `devsecops-terraform`
 - Region `ap-south-1`
-- Terraform environment `dev` by default
+- Application environment `dev` by default
+- Archive state in `infrastructure/terraform/environments/archive`
 
-Override these with `AWS_PROFILE`, `AWS_REGION`, or `TF_ENVIRONMENT`.
+Override these with `AWS_PROFILE`, `AWS_REGION`, `TF_ENVIRONMENT`, or `ARCHIVE_TF_DIRECTORY`.
+
+## Deployment order
+
+1. Apply `environments/archive` first.
+2. Apply the dev or prod application environment.
+3. Destroy dev or prod when finished; leave the archive stack running.
 
 ## Export application logs
 
@@ -69,7 +76,7 @@ A successful task should report exit code `0` for both `database-dump` and
 ```bash
 bucket="$(
   AWS_PROFILE=devsecops-terraform \
-  terraform -chdir=infrastructure/terraform/environments/dev \
+  terraform -chdir=infrastructure/terraform/environments/archive \
   output -raw archive_bucket_name
 )"
 
@@ -88,6 +95,8 @@ RDS automated backups remain the primary recovery mechanism. The SQL dump in
 S3 is a portable secondary backup. Test restoration before treating any backup
 as production-ready.
 
-The archive bucket has `force_destroy = false`, so Terraform will refuse to
-delete a non-empty bucket. Copy or deliberately remove retained archives before
-destroying that environment.
+The archive stack is independent from dev and prod. Destroying the application
+environment does not destroy archived logs or backups.
+
+The bucket has `force_destroy = false`. Destroy the archive stack only when its
+retained objects have been deliberately copied or removed.

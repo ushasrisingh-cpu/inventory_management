@@ -1,15 +1,27 @@
+data "aws_caller_identity" "current" {}
+
 data "aws_region" "current" {}
+
+locals {
+  cloudwatch_log_group_arns = flatten([
+    for environment in var.environments : [
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/ecs/${var.project_name}/${environment}:*",
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/vpc/${var.project_name}/${environment}/flow-logs:*"
+    ]
+  ])
+}
+
 
 resource "aws_s3_bucket" "archive" {
   #checkov:skip=CKV2_AWS_62:Event notifications are not required because this archive has no event-driven consumer.
   #checkov:skip=CKV_AWS_18:Access logging would require a second logging bucket; CloudTrail monitoring is preferred for this small dev archive.
   #checkov:skip=CKV_AWS_144:Cross-region replication is intentionally omitted for this cost-conscious dev environment.
   #checkov:skip=CKV_AWS_145:SSE-S3 is intentional so retained archives do not depend on the disposable environment KMS key.
-  bucket = substr(lower("${var.project_name}-${var.environment}-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}-archive"), 0, 63)
+  bucket = substr(lower("${var.project_name}-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}-archive"), 0, 63)
 
   force_destroy = false
 
-  tags = local.common_tags
+  tags = var.tags
 }
 
 resource "aws_s3_bucket_public_access_block" "archive" {
@@ -79,10 +91,7 @@ resource "aws_s3_bucket_policy" "archive" {
             "aws:SourceAccount" = data.aws_caller_identity.current.account_id
           }
           ArnLike = {
-            "aws:SourceArn" = [
-              "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/ecs/${var.project_name}/${var.environment}",
-              "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/vpc/${var.project_name}/${var.environment}/flow-logs"
-            ]
+            "aws:SourceArn" = local.cloudwatch_log_group_arns
           }
         }
       },
@@ -98,10 +107,7 @@ resource "aws_s3_bucket_policy" "archive" {
             "s3:x-amz-acl"      = "bucket-owner-full-control"
           }
           ArnLike = {
-            "aws:SourceArn" = [
-              "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/ecs/${var.project_name}/${var.environment}",
-              "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/vpc/${var.project_name}/${var.environment}/flow-logs"
-            ]
+            "aws:SourceArn" = local.cloudwatch_log_group_arns
           }
         }
       }

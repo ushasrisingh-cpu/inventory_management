@@ -8,10 +8,10 @@ DAYS="${3:-1}"
 AWS_PROFILE="${AWS_PROFILE:-devsecops-terraform}"
 AWS_REGION="${AWS_REGION:-ap-south-1}"
 TF_ENVIRONMENT="${TF_ENVIRONMENT:-dev}"
-TF_DIRECTORY="infrastructure/terraform/environments/${TF_ENVIRONMENT}"
+ARCHIVE_TF_DIRECTORY="${ARCHIVE_TF_DIRECTORY:-infrastructure/terraform/environments/archive}"
 
 BUCKET="$(
-  AWS_PROFILE="$AWS_PROFILE" terraform -chdir="$TF_DIRECTORY" \
+  AWS_PROFILE="$AWS_PROFILE" terraform -chdir="$ARCHIVE_TF_DIRECTORY" \
     output -raw archive_bucket_name
 )"
 
