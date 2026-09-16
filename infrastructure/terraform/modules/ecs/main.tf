@@ -121,7 +121,7 @@ resource "aws_ecs_service" "this" {
     container_port   = var.app_port
   }
   lifecycle {
-    ignore_changes = [desired_count]
+    ignore_changes = [desired_count, task_definition]
   }
   depends_on = [aws_lb_listener.http]
   tags       = var.tags
