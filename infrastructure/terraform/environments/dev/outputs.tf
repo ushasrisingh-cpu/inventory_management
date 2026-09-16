@@ -12,3 +12,11 @@ output "managed_master_user_secret_arn" {
 }
 output "github_actions_role_arn" { value = module.infrastructure.github_actions_role_arn }
 output "platform_kms_key_arn" { value = module.infrastructure.platform_kms_key_arn }
+output "archive_bucket_name" { value = module.infrastructure.archive_bucket_name }
+output "database_backup_task_definition_arn" {
+  value = module.infrastructure.database_backup_task_definition_arn
+}
+
+output "task_security_group_id" {
+  value = module.infrastructure.task_security_group_id
+}
