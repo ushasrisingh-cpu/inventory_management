@@ -40,7 +40,7 @@ Override these with `AWS_PROFILE`, `AWS_REGION`, `TF_ENVIRONMENT`, or `ARCHIVE_T
 
 ## Export application logs
 
-CloudWatch logs can take up to 12 hours to become exportable.
+The script reads CloudWatch events directly, compresses them as JSON, and uploads them to the persistent S3 bucket.
 
 ```bash
 scripts/export-cloudwatch-logs.sh \
@@ -52,8 +52,7 @@ scripts/export-cloudwatch-logs.sh \
 
 ## Export VPC flow logs
 
-Only one CloudWatch Logs export task can run at a time. Wait for the first
-export to finish before starting this command:
+The same script archives VPC flow logs independently.
 
 ```bash
 scripts/export-cloudwatch-logs.sh \
