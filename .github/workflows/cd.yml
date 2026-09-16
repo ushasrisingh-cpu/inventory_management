@@ -34,11 +34,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: >-
-      (github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'master') ||
-      (github.event_name == 'workflow_dispatch' &&
-      github.ref == 'refs/heads/master')
+      vars.DEV_INFRA_ENABLED == 'true' &&
+      (
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == 'master') ||
+        (github.event_name == 'workflow_dispatch' &&
+         github.ref == 'refs/heads/master')
+      )
     steps:
       - name: Check out source
         uses: actions/checkout@v6
