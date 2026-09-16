@@ -73,7 +73,7 @@ resource "aws_ecs_task_definition" "database_backup" {
 
       entryPoint = ["/bin/sh", "-c"]
       command = [
-        "mysqldump --single-transaction --quick --lock-tables=false --host=\"$DB_HOST\" --port=\"$DB_PORT\" --user=\"$DB_USERNAME\" --password=\"$DB_PASSWORD\" \"$DB_NAME\" > /backup/inventory.sql"
+        "mysqldump --single-transaction --quick --skip-lock-tables --set-gtid-purged=OFF --no-tablespaces --host=\"$DB_HOST\" --port=\"$DB_PORT\" --user=\"$DB_USERNAME\" --password=\"$DB_PASSWORD\" \"$DB_NAME\" > /backup/inventory.sql"
       ]
 
       environment = [
