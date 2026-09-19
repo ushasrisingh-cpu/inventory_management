@@ -1,58 +1,43 @@
-# S3 log archive and database backups
+# S3 Log Archive and Database Backups
 
 ## Design
 
-The archive bucket is private, blocks all public access, requires HTTPS,
-uses S3-managed encryption, enables versioning, and has lifecycle retention:
+The archive stack is independent from dev and production. Its private bucket blocks public access, denies insecure transport, enables AES256 server-side encryption and versioning, expires `logs/` objects after 30 days, expires `backups/` objects after 90 days, and aborts incomplete multipart uploads after seven days. `force_destroy = false` prevents routine Terraform destruction of retained data.
 
-- `logs/`: deleted after 30 days
-- `backups/`: deleted after 90 days
-- incomplete multipart uploads: aborted after 7 days
-
-CloudWatch application and VPC flow logs can be exported to `logs/`.
-
-Database backups use a one-off ECS Fargate task inside the VPC:
-
-1. `mysql:8.4` runs `mysqldump` against private RDS.
-2. The dump is stored temporarily in the task.
-3. An AWS CLI container uploads it to `backups/<environment>/`.
-4. The task stops.
-
-The application task has no S3 write permission. A separate least-privilege
-backup role can write only beneath `backups/`.
-
-## Requirements
-
-The persistent archive stack must be deployed before the application environment. The scripts use:
-
-- AWS profile `devsecops-terraform`
-- Region `ap-south-1`
-- Application environment `dev` by default
-- Archive state in `infrastructure/terraform/environments/archive`
-
-Override these with `AWS_PROFILE`, `AWS_REGION`, `TF_ENVIRONMENT`, or `ARCHIVE_TF_DIRECTORY`.
+RDS automated backups remain the primary managed recovery mechanism. The SQL file in S3 is a portable secondary backup.
 
 ## Deployment order
 
-1. Apply `environments/archive` first.
-2. Apply the dev or prod application environment.
-3. Destroy dev or prod when finished; leave the archive stack running.
+1. Apply `infrastructure/terraform/environments/archive`.
+2. Apply the dev or production application environment.
+3. Deploy the application image.
+4. Run and verify required backup and log-archive operations.
+5. Destroy the disposable application environment when testing ends.
+6. Leave the archive stack running until its retention obligation ends.
 
-## Export application logs
+## Requirements
 
-The script reads CloudWatch events directly, compresses them as JSON, and uploads them to the persistent S3 bucket.
+The scripts default to:
+
+- AWS profile `devsecops-terraform`
+- Region `ap-south-1`
+- Application environment `dev`
+- Archive state in `infrastructure/terraform/environments/archive`
+
+Override defaults only through the documented environment variables. Reauthenticate the underlying temporary AWS profile when its session expires.
+
+## Archive application logs
 
 ```bash
 scripts/export-cloudwatch-logs.sh \
   /aws/ecs/inventory-management/dev \
   logs/application/dev \
   1
-
 ```
 
-## Export VPC flow logs
+The script reads CloudWatch events directly, writes compressed JSON, and uploads it to the archive bucket. Direct reading replaced the CloudWatch export-task API after that API incorrectly reported a deleted KMS association.
 
-The same script archives VPC flow logs independently.
+## Archive VPC flow logs
 
 ```bash
 scripts/export-cloudwatch-logs.sh \
@@ -61,16 +46,21 @@ scripts/export-cloudwatch-logs.sh \
   1
 ```
 
-## Create a database backup
+## Create a portable database backup
 
 ```bash
 scripts/run-database-backup.sh
 ```
 
-A successful task should report exit code `0` for both `database-dump` and
-`backup-upload`.
+The script starts the registered one-off Fargate backup task and waits for it to stop. Success requires exit code `0` for both `database-dump` and `backup-upload`.
 
-## Verify archive objects
+The dump command uses options compatible with the managed RDS user:
+
+```text
+--single-transaction --quick --skip-lock-tables --set-gtid-purged=OFF --no-tablespaces
+```
+
+## Verify retained objects
 
 ```bash
 bucket="$(
@@ -79,23 +69,21 @@ bucket="$(
   output -raw archive_bucket_name
 )"
 
-AWS_PROFILE=devsecops-terraform aws s3 ls \
-  "s3://$bucket/logs/" \
-  --recursive
-
-AWS_PROFILE=devsecops-terraform aws s3 ls \
-  "s3://$bucket/backups/" \
-  --recursive
+AWS_PROFILE=devsecops-terraform aws s3api list-objects-v2 \
+  --bucket "$bucket" \
+  --query 'Contents[].{Key:Key,SizeBytes:Size,Modified:LastModified}' \
+  --output table \
+  --no-cli-pager
 ```
 
-## Important
+Use `head-object` for the selected key and verify nonzero size, `AES256`, and a version ID.
 
-RDS automated backups remain the primary recovery mechanism. The SQL dump in
-S3 is a portable secondary backup. Test restoration before treating any backup
-as production-ready.
+## Restore verification
 
-The archive stack is independent from dev and prod. Destroying the application
-environment does not destroy archived logs or backups.
+Restore portable SQL only into an isolated approved database. Download the selected object version, start a clean compatible MySQL instance, import the SQL file, and validate schema and representative record counts. The capstone restore test recovered eight tables, four member records, and eight product records. Remove the temporary database after verification.
 
-The bucket has `force_destroy = false`. Destroy the archive stack only when its
-retained objects have been deliberately copied or removed.
+Never restore over the active application database as an informal test.
+
+## Cleanup warning
+
+Destroying dev must not include the archive bucket. Destroy the archive environment only after an explicit retention and ownership review. Copy or deliberately remove retained object versions before attempting archive destruction.
