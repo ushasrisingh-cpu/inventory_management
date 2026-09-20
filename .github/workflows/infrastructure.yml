@@ -1,6 +1,9 @@
 name: Terraform infrastructure
 
 on:
+  push:
+    branches:
+      - master
   workflow_dispatch:
     inputs:
       environment:
@@ -22,7 +25,7 @@ env:
   TF_VERSION: "1.13.5"
 
 concurrency:
-  group: terraform-${{ inputs.environment }}
+  group: terraform-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
   cancel-in-progress: false
 
 jobs:
@@ -42,10 +45,10 @@ jobs:
         run: terraform fmt -check -recursive infrastructure/terraform
 
       - name: Initialize selected environment without backend
-        run: terraform -chdir="infrastructure/terraform/environments/${{ inputs.environment }}" init -backend=false
+        run: terraform -chdir="infrastructure/terraform/environments/${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}" init -backend=false
 
       - name: Validate selected environment
-        run: terraform -chdir="infrastructure/terraform/environments/${{ inputs.environment }}" validate
+        run: terraform -chdir="infrastructure/terraform/environments/${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}" validate
 
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@v12
@@ -60,7 +63,7 @@ jobs:
             CKV_AWS_129,CKV_AWS_157,CKV2_AWS_5
 
   plan:
-    name: Plan ${{ inputs.environment }}
+    name: Plan ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
     needs: validate
     runs-on: ubuntu-latest
     outputs:
@@ -83,7 +86,7 @@ jobs:
       - name: Detect first deployment
         id: mode
         env:
-          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          TARGET_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
         run: |
           cluster="inventory-management-${TARGET_ENVIRONMENT}"
           status="$(aws ecs describe-clusters --clusters "$cluster" --query 'clusters[0].status' --output text 2>/dev/null || true)"
@@ -95,7 +98,7 @@ jobs:
 
       - name: Initialize remote state
         env:
-          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          TARGET_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
           TF_STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
         run: |
           terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" init \
@@ -107,7 +110,7 @@ jobs:
 
       - name: Create reviewed plan
         env:
-          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          TARGET_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
           BOOTSTRAP: ${{ steps.mode.outputs.bootstrap }}
         run: |
           extra_vars=()
@@ -151,11 +154,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   apply:
-    name: Apply ${{ inputs.environment }} after approval
+    name: Apply ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }} after approval
     needs: plan
     runs-on: ubuntu-latest
     environment:
-      name: terraform-${{ inputs.environment }}
+      name: terraform-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
     steps:
       - name: Check out reviewed commit
         uses: actions/checkout@v6
@@ -173,7 +176,7 @@ jobs:
 
       - name: Initialize remote state
         env:
-          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          TARGET_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
           TF_STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
         run: |
           terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" init \
@@ -185,7 +188,7 @@ jobs:
 
       - name: Recreate and apply approved plan
         env:
-          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          TARGET_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
           BOOTSTRAP: ${{ needs.plan.outputs.bootstrap }}
         run: |
           extra_vars=()
@@ -224,7 +227,7 @@ jobs:
       - name: Download bootstrap task definition
         if: needs.plan.outputs.bootstrap == 'true'
         env:
-          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          TARGET_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
         run: |
           aws ecs describe-task-definition \
             --task-definition "inventory-management-${TARGET_ENVIRONMENT}" \
@@ -245,8 +248,8 @@ jobs:
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.task-definition.outputs.task-definition }}
-          service: inventory-management-${{ inputs.environment }}
-          cluster: inventory-management-${{ inputs.environment }}
+          service: inventory-management-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+          cluster: inventory-management-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
           desired-count: 1
           wait-for-service-stability: true
           wait-max-delay-seconds: 15
@@ -254,7 +257,7 @@ jobs:
       - name: Enable autoscaling after first deployment
         if: needs.plan.outputs.bootstrap == 'true'
         env:
-          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          TARGET_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
         run: |
           terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" plan \
             -out=autoscaling.tfplan \
