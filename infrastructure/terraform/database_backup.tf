@@ -227,6 +227,16 @@ resource "aws_iam_role_policy" "database_backup_scheduler" {
             "iam:PassedToService" = "ecs-tasks.amazonaws.com"
           }
         }
+      },
+      {
+        Sid    = "UseDatabaseBackupScheduleKey"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey",
+          "kms:GenerateDataKey"
+        ]
+        Resource = aws_kms_key.platform.arn
       }
     ]
   })
@@ -239,6 +249,7 @@ resource "aws_scheduler_schedule" "database_backup" {
   description         = "Create a portable database backup and upload it to the persistent archive bucket."
   schedule_expression = var.database_backup_schedule_expression
   state               = "ENABLED"
+  kms_key_arn         = aws_kms_key.platform.arn
 
   flexible_time_window {
     mode = "OFF"
