@@ -91,7 +91,8 @@ jobs:
           cluster="inventory-management-${TARGET_ENVIRONMENT}"
           status="$(aws ecs describe-clusters --clusters "$cluster" --query 'clusters[0].status' --output text 2>/dev/null || true)"
           image_count="$(aws ecr describe-images --repository-name inventory-management --query 'length(imageDetails)' --output text 2>/dev/null || echo 0)"
-          if [ "$status" = "ACTIVE" ] && [[ "$image_count" =~ ^[1-9][0-9]*$ ]]; then
+          desired_count="$(aws ecs describe-services --cluster "$cluster" --services "$cluster" --query 'services[0].desiredCount' --output text 2>/dev/null || echo 0)"
+          if [ "$status" = "ACTIVE" ] && [[ "$image_count" =~ ^[1-9][0-9]*$ ]] && [[ "$desired_count" =~ ^[1-9][0-9]*$ ]]; then
             echo "bootstrap=false" >> "$GITHUB_OUTPUT"
           else
             echo "bootstrap=true" >> "$GITHUB_OUTPUT"
@@ -221,8 +222,13 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           image="${REGISTRY}/inventory-management:${IMAGE_TAG}"
-          docker build --tag "$image" .
-          docker push "$image"
+          if aws ecr describe-images --repository-name inventory-management --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "Image $image already exists; reusing immutable tag."
+          else
+            docker build --tag "$image" .
+            docker push "$image"
+          fi
+          
           echo "IMAGE_URI=$image" >> "$GITHUB_ENV"
 
       - name: Download bootstrap task definition
