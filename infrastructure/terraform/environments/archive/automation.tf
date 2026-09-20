@@ -33,9 +33,9 @@ resource "aws_iam_role" "platform_automation" {
         }
         StringLike = {
           "token.actions.githubusercontent.com:sub" = [
-            "repo:${var.github_repository}:ref:refs/heads/${var.github_branch}",
-            "repo:${var.github_repository}:environment:terraform-dev",
-            "repo:${var.github_repository}:environment:terraform-prod"
+            "repo:ushasrisingh-cpu@318326122/inventory_management@1342675104:ref:refs/heads/${var.github_branch}",
+            "repo:ushasrisingh-cpu@318326122/inventory_management@1342675104:environment:terraform-dev",
+            "repo:ushasrisingh-cpu@318326122/inventory_management@1342675104:environment:terraform-prod"
           ]
         }
       }
@@ -165,7 +165,7 @@ resource "aws_iam_role" "application_deploy" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:ref:refs/heads/${var.github_branch}"
+          "token.actions.githubusercontent.com:sub" = "repo:ushasrisingh-cpu@318326122/inventory_management@1342675104:ref:refs/heads/${var.github_branch}"
         }
       }
     }]
