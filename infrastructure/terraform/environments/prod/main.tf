@@ -24,6 +24,7 @@ module "infrastructure" {
   ecs_autoscaling_min_capacity           = var.ecs_autoscaling_min_capacity
   ecs_autoscaling_max_capacity           = var.ecs_autoscaling_max_capacity
   ecs_autoscaling_target_cpu_utilization = var.ecs_autoscaling_target_cpu_utilization
+  ecs_autoscaling_target_request_count   = var.ecs_autoscaling_target_request_count
   ecs_autoscaling_scale_in_cooldown      = var.ecs_autoscaling_scale_in_cooldown
   ecs_autoscaling_scale_out_cooldown     = var.ecs_autoscaling_scale_out_cooldown
   ecs_app_port                           = var.ecs_app_port
@@ -31,6 +32,8 @@ module "infrastructure" {
   ecs_log_retention_days                 = var.ecs_log_retention_days
   ecs_health_check_path                  = var.ecs_health_check_path
   spring_profiles_active                 = var.spring_profiles_active
+  enable_scheduled_database_backup       = var.enable_scheduled_database_backup
+  database_backup_schedule_expression    = var.database_backup_schedule_expression
   ecr_image_retention_count              = var.ecr_image_retention_count
   ecr_kms_key_arn                        = var.ecr_kms_key_arn
   enable_github_oidc                     = var.enable_github_oidc

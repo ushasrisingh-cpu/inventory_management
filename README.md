@@ -67,6 +67,8 @@ See [CI/CD flow](architecture/cicd-flow.md).
 
 ## Repository documentation
 
+- [Automated platform operations](docs/AUTOMATED_PLATFORM_OPERATIONS.md)
+
 - [AI specification alignment](ai-specifications/implementation-alignment.md)
 - [High-level architecture](architecture/high-level-architecture.md)
 - [AWS architecture](architecture/aws-architecture.md)

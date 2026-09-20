@@ -79,6 +79,7 @@ module "ecs" {
   autoscaling_min_capacity           = var.ecs_autoscaling_min_capacity
   autoscaling_max_capacity           = var.ecs_autoscaling_max_capacity
   autoscaling_target_cpu_utilization = var.ecs_autoscaling_target_cpu_utilization
+  autoscaling_target_request_count   = var.ecs_autoscaling_target_request_count
   autoscaling_scale_in_cooldown      = var.ecs_autoscaling_scale_in_cooldown
   autoscaling_scale_out_cooldown     = var.ecs_autoscaling_scale_out_cooldown
   app_port                           = var.ecs_app_port

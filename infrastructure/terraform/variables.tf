@@ -102,6 +102,11 @@ variable "ecs_autoscaling_target_cpu_utilization" {
   default = 60
 }
 
+variable "ecs_autoscaling_target_request_count" {
+  type    = number
+  default = 1000
+}
+
 variable "ecs_autoscaling_scale_in_cooldown" {
   type    = number
   default = 120
@@ -146,6 +151,16 @@ variable "github_branch" {
 variable "rds_backup_retention_period" {
   type    = number
   default = 7
+}
+
+variable "enable_scheduled_database_backup" {
+  type    = bool
+  default = true
+}
+
+variable "database_backup_schedule_expression" {
+  type    = string
+  default = "cron(0 2 * * ? *)"
 }
 
 variable "rds_instance_class" {

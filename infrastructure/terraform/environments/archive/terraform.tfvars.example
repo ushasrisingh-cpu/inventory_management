@@ -1,6 +1,8 @@
 aws_region   = "ap-south-1"
 project_name = "inventory-management"
 environments = ["dev", "prod"]
+github_repository = "ushasrisingh-cpu/inventory_management"
+github_branch     = "master"
 
 tags = {
   Owner = "devsecops"

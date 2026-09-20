@@ -167,6 +167,105 @@ resource "aws_ecs_task_definition" "database_backup" {
   tags = local.common_tags
 }
 
+resource "aws_iam_role" "database_backup_scheduler" {
+  count = var.enable_scheduled_database_backup ? 1 : 0
+
+  name = "${var.project_name}-${var.environment}-database-backup-scheduler"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "scheduler.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+      Condition = {
+        StringEquals = {
+          "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+        }
+        ArnLike = {
+          "aws:SourceArn" = "arn:${data.aws_partition.current.partition}:scheduler:${var.aws_region}:${data.aws_caller_identity.current.account_id}:schedule/default/${var.project_name}-${var.environment}-database-backup"
+        }
+      }
+    }]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy" "database_backup_scheduler" {
+  count = var.enable_scheduled_database_backup ? 1 : 0
+
+  name = "${var.project_name}-${var.environment}-database-backup-scheduler"
+  role = aws_iam_role.database_backup_scheduler[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "RunDatabaseBackupTask"
+        Effect   = "Allow"
+        Action   = "ecs:RunTask"
+        Resource = aws_ecs_task_definition.database_backup.arn
+        Condition = {
+          ArnEquals = {
+            "ecs:cluster" = "arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${module.ecs.cluster_name}"
+          }
+        }
+      },
+      {
+        Sid    = "PassDatabaseBackupRoles"
+        Effect = "Allow"
+        Action = "iam:PassRole"
+        Resource = [
+          module.iam.ecs_execution_role_arn,
+          aws_iam_role.database_backup.arn
+        ]
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ecs-tasks.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_scheduler_schedule" "database_backup" {
+  count = var.enable_scheduled_database_backup ? 1 : 0
+
+  name                = "${var.project_name}-${var.environment}-database-backup"
+  description         = "Create a portable database backup and upload it to the persistent archive bucket."
+  schedule_expression = var.database_backup_schedule_expression
+  state               = "ENABLED"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = "arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${module.ecs.cluster_name}"
+    role_arn = aws_iam_role.database_backup_scheduler[0].arn
+
+    ecs_parameters {
+      task_definition_arn = aws_ecs_task_definition.database_backup.arn
+      launch_type         = "FARGATE"
+
+      network_configuration {
+        assign_public_ip = var.ecs_assign_public_ip
+        security_groups  = [module.networking.task_security_group_id]
+        subnets          = var.ecs_assign_public_ip ? module.networking.public_subnet_ids : module.networking.private_subnet_ids
+      }
+    }
+
+    retry_policy {
+      maximum_event_age_in_seconds = 3600
+      maximum_retry_attempts       = 2
+    }
+  }
+}
+
 output "database_backup_task_definition_arn" {
   value = aws_ecs_task_definition.database_backup.arn
 }
