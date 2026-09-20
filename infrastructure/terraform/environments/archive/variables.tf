@@ -13,6 +13,17 @@ variable "environments" {
   default = ["dev", "prod"]
 }
 
+variable "github_repository" {
+  description = "GitHub repository allowed to assume the platform automation role, in owner/repository format."
+  type        = string
+}
+
+variable "github_branch" {
+  description = "Git branch allowed to run infrastructure plans."
+  type        = string
+  default     = "master"
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

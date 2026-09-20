@@ -46,7 +46,15 @@ scripts/export-cloudwatch-logs.sh \
   1
 ```
 
-## Create a portable database backup
+## Automated portable database backup
+
+EventBridge Scheduler runs the registered one-off Fargate backup task every day
+at `02:00 UTC` by default. Change
+`database_backup_schedule_expression` when a different schedule is required.
+The schedule uses the same public task networking as development and the same
+private task networking as production.
+
+To start an additional backup on demand, run:
 
 ```bash
 scripts/run-database-backup.sh

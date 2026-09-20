@@ -45,6 +45,11 @@ variable "autoscaling_target_cpu_utilization" {
   default = 60
 }
 
+variable "autoscaling_target_request_count" {
+  type    = number
+  default = 1000
+}
+
 variable "autoscaling_scale_in_cooldown" {
   type    = number
   default = 120

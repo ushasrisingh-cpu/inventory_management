@@ -23,6 +23,7 @@ ecs_enable_autoscaling                 = true
 ecs_autoscaling_min_capacity           = 2
 ecs_autoscaling_max_capacity           = 4
 ecs_autoscaling_target_cpu_utilization = 60
+ecs_autoscaling_target_request_count   = 1000
 ecs_autoscaling_scale_in_cooldown      = 120
 ecs_autoscaling_scale_out_cooldown     = 60
 ecs_app_port                      = 8080
@@ -30,7 +31,9 @@ ecs_assign_public_ip              = false
 ecs_log_retention_days            = 90
 ecs_health_check_path             = "/actuator/health/readiness"
 spring_profiles_active            = "prod"
-enable_github_oidc                = true
+enable_scheduled_database_backup    = true
+database_backup_schedule_expression = "cron(0 2 * * ? *)"
+enable_github_oidc                = false
 github_repository                 = "owner/repository"
 github_branch                     = "master"
 rds_instance_class                = "db.t3.small"
@@ -46,4 +49,5 @@ rds_monitoring_interval           = 60
 rds_cloudwatch_log_exports        = ["audit", "error", "general", "slowquery"]
 rds_kms_key_arn                   = null
 
-# Push an immutable image before deployment and review the plan carefully.
+# The infrastructure workflow bootstraps at zero tasks, deploys the first image,
+# and then enables autoscaling automatically after approval.

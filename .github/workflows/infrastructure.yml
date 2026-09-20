@@ -1,0 +1,268 @@
+name: Terraform infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to plan and apply
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-south-1
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_VERSION: "1.13.5"
+
+concurrency:
+  group: terraform-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Format, validate, and scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infrastructure/terraform
+
+      - name: Initialize selected environment without backend
+        run: terraform -chdir="infrastructure/terraform/environments/${{ inputs.environment }}" init -backend=false
+
+      - name: Validate selected environment
+        run: terraform -chdir="infrastructure/terraform/environments/${{ inputs.environment }}" validate
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infrastructure/terraform
+          framework: terraform
+          quiet: true
+          compact: true
+          skip_check: >-
+            CKV_AWS_38,CKV_AWS_338,CKV_AWS_260,
+            CKV_AWS_118,CKV_AWS_353,CKV_AWS_293,
+            CKV_AWS_129,CKV_AWS_157,CKV2_AWS_5
+
+  plan:
+    name: Plan ${{ inputs.environment }}
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      bootstrap: ${{ steps.mode.outputs.bootstrap }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.TERRAFORM_AWS_ROLE_ARN }}
+
+      - name: Detect first deployment
+        id: mode
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          cluster="inventory-management-${TARGET_ENVIRONMENT}"
+          status="$(aws ecs describe-clusters --clusters "$cluster" --query 'clusters[0].status' --output text 2>/dev/null || true)"
+          if [ "$status" = "ACTIVE" ]; then
+            echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bootstrap=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Initialize remote state
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          TF_STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
+        run: |
+          terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=terraform/${TARGET_ENVIRONMENT}.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Create reviewed plan
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          BOOTSTRAP: ${{ steps.mode.outputs.bootstrap }}
+        run: |
+          extra_vars=()
+          if [ "$BOOTSTRAP" = "true" ]; then
+            extra_vars+=(
+              -var="ecs_desired_count=0"
+              -var="ecs_enable_autoscaling=false"
+            )
+          fi
+
+          set +e
+          terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" plan \
+            -detailed-exitcode \
+            -no-color \
+            -out=tfplan \
+            -var-file=terraform.tfvars.example \
+            -var="github_repository=${GITHUB_REPOSITORY}" \
+            -var="enable_github_oidc=false" \
+            -var="ecs_image_tag=${GITHUB_SHA}" \
+            "${extra_vars[@]}"
+          exit_code=$?
+          set -e
+
+          if [ "$exit_code" -eq 1 ]; then
+            exit 1
+          fi
+
+          terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" show \
+            -no-color tfplan > "$RUNNER_TEMP/terraform-plan.txt"
+
+          {
+            echo "## Terraform ${TARGET_ENVIRONMENT} plan"
+            echo
+            echo "Bootstrap deployment: **${BOOTSTRAP}**"
+            echo
+            echo '```text'
+            sed -n '1,350p' "$RUNNER_TEMP/terraform-plan.txt"
+            echo '```'
+            echo
+            echo "The apply job will recreate the plan from the same commit after approval."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    name: Apply ${{ inputs.environment }} after approval
+    needs: plan
+    runs-on: ubuntu-latest
+    environment:
+      name: terraform-${{ inputs.environment }}
+    steps:
+      - name: Check out reviewed commit
+        uses: actions/checkout@v6
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.TERRAFORM_AWS_ROLE_ARN }}
+
+      - name: Initialize remote state
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          TF_STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
+        run: |
+          terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=terraform/${TARGET_ENVIRONMENT}.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Recreate and apply approved plan
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          BOOTSTRAP: ${{ needs.plan.outputs.bootstrap }}
+        run: |
+          extra_vars=()
+          if [ "$BOOTSTRAP" = "true" ]; then
+            extra_vars+=(
+              -var="ecs_desired_count=0"
+              -var="ecs_enable_autoscaling=false"
+            )
+          fi
+
+          terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" plan \
+            -out=tfplan \
+            -var-file=terraform.tfvars.example \
+            -var="github_repository=${GITHUB_REPOSITORY}" \
+            -var="enable_github_oidc=false" \
+            -var="ecs_image_tag=${GITHUB_SHA}" \
+            "${extra_vars[@]}"
+          terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" apply -auto-approve tfplan
+
+      - name: Log in to Amazon ECR for first deployment
+        if: needs.plan.outputs.bootstrap == 'true'
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push first application image
+        if: needs.plan.outputs.bootstrap == 'true'
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          image="${REGISTRY}/inventory-management:${IMAGE_TAG}"
+          docker build --tag "$image" .
+          docker push "$image"
+          echo "IMAGE_URI=$image" >> "$GITHUB_ENV"
+
+      - name: Download bootstrap task definition
+        if: needs.plan.outputs.bootstrap == 'true'
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "inventory-management-${TARGET_ENVIRONMENT}" \
+            --query taskDefinition \
+            --output json > "$RUNNER_TEMP/task-definition.json"
+
+      - name: Render immutable bootstrap image
+        if: needs.plan.outputs.bootstrap == 'true'
+        id: task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ runner.temp }}/task-definition.json
+          container-name: inventory-management
+          image: ${{ env.IMAGE_URI }}
+
+      - name: Deploy first application task
+        if: needs.plan.outputs.bootstrap == 'true'
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-definition.outputs.task-definition }}
+          service: inventory-management-${{ inputs.environment }}
+          cluster: inventory-management-${{ inputs.environment }}
+          desired-count: 1
+          wait-for-service-stability: true
+          wait-max-delay-seconds: 15
+
+      - name: Enable autoscaling after first deployment
+        if: needs.plan.outputs.bootstrap == 'true'
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" plan \
+            -out=autoscaling.tfplan \
+            -var-file=terraform.tfvars.example \
+            -var="github_repository=${GITHUB_REPOSITORY}" \
+            -var="enable_github_oidc=false" \
+            -var="ecs_desired_count=1" \
+            -var="ecs_enable_autoscaling=true" \
+            -var="ecs_image_tag=${GITHUB_SHA}"
+          terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" apply \
+            -auto-approve autoscaling.tfplan

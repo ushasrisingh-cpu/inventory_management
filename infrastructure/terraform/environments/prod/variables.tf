@@ -54,6 +54,11 @@ variable "ecs_autoscaling_target_cpu_utilization" {
   default = 60
 }
 
+variable "ecs_autoscaling_target_request_count" {
+  type    = number
+  default = 1000
+}
+
 variable "ecs_autoscaling_scale_in_cooldown" {
   type    = number
   default = 120
@@ -68,4 +73,14 @@ variable "ecs_assign_public_ip" { type = bool }
 variable "ecs_log_retention_days" { type = number }
 variable "ecs_health_check_path" { type = string }
 variable "spring_profiles_active" { type = string }
+
+variable "enable_scheduled_database_backup" {
+  type    = bool
+  default = true
+}
+
+variable "database_backup_schedule_expression" {
+  type    = string
+  default = "cron(0 2 * * ? *)"
+}
 variable "nat_gateway_strategy" { type = string }
