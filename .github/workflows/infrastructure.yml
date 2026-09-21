@@ -15,6 +15,7 @@ on:
           - prod
 
 permissions:
+  actions: read
   contents: read
   id-token: write
 
@@ -210,12 +211,53 @@ jobs:
             "${extra_vars[@]}"
           terraform -chdir="infrastructure/terraform/environments/${TARGET_ENVIRONMENT}" apply -auto-approve tfplan
 
+      - name: Confirm CI produced the approved bootstrap image
+        if: needs.plan.outputs.bootstrap == 'true'
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 40); do
+            result="$(gh run list \
+              --workflow ci.yml \
+              --commit "$GITHUB_SHA" \
+              --limit 1 \
+              --json databaseId,status,conclusion \
+              --jq 'if length == 0 then "missing" else "\(.[0].databaseId) \(.[0].status) \(.[0].conclusion)" end')"
+
+            read -r run_id status conclusion <<< "$result"
+            if [ "$status" = "completed" ] && [ "$conclusion" = "success" ]; then
+              echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+              echo "CI produced the scanned image for $GITHUB_SHA."
+              exit 0
+            fi
+            if [ "$status" = "completed" ]; then
+              echo "CI did not succeed for $GITHUB_SHA: $result" >&2
+              exit 1
+            fi
+
+            echo "Waiting for CI image artifact for $GITHUB_SHA: $result"
+            sleep 15
+          done
+
+          echo "Timed out waiting for the CI image artifact." >&2
+          exit 1
+
+      - name: Download scanned bootstrap image
+        if: needs.plan.outputs.bootstrap == 'true'
+        uses: actions/download-artifact@v6
+        with:
+          name: inventory-management-image-${{ github.sha }}
+          path: ${{ runner.temp }}/container-image
+          run-id: ${{ steps.ci.outputs.run_id }}
+          github-token: ${{ github.token }}
+
       - name: Log in to Amazon ECR for first deployment
         if: needs.plan.outputs.bootstrap == 'true'
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push first application image
+      - name: Push CI-approved first application image
         if: needs.plan.outputs.bootstrap == 'true'
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
@@ -225,10 +267,11 @@ jobs:
           if aws ecr describe-images --repository-name inventory-management --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
             echo "Image $image already exists; reusing immutable tag."
           else
-            docker build --tag "$image" .
+            docker load --input "$RUNNER_TEMP/container-image/inventory-management-image.tar"
+            docker tag "inventory-management:${IMAGE_TAG}" "$image"
             docker push "$image"
           fi
-          
+
           echo "IMAGE_URI=$image" >> "$GITHUB_ENV"
 
       - name: Download bootstrap task definition
