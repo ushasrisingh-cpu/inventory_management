@@ -192,26 +192,15 @@ jobs:
           checkov -f "$RUNNER_TEMP/rendered/dev.yaml" -f "$RUNNER_TEMP/rendered/prod.yaml"
           --skip-check CKV_K8S_35,CKV_K8S_43
 
-  docker-build:
-    name: Docker image build
+  trivy-image:
+    name: Trivy Docker image scan
     needs: maven-package
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@v6
 
-      - name: Build immutable local image
-        run: docker build --tag "${IMAGE_NAME}:${IMAGE_TAG}" .
-
-  trivy-image:
-    name: Trivy Docker image scan
-    needs: docker-build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v6
-
-      - name: Build immutable local image for scanning
+      - name: Build immutable image once
         run: docker build --tag "${IMAGE_NAME}:${IMAGE_TAG}" .
 
       - name: Scan fixable high and critical vulnerabilities
@@ -223,3 +212,17 @@ jobs:
           exit-code: "1"
           format: table
           trivyignores: .trivyignore
+
+      - name: Save the scanned image for deployment
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: docker save --output "$RUNNER_TEMP/inventory-management-image.tar" "${IMAGE_NAME}:${IMAGE_TAG}"
+
+      - name: Publish the scanned image artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v6
+        with:
+          name: inventory-management-image-${{ github.sha }}
+          path: ${{ runner.temp }}/inventory-management-image.tar
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
