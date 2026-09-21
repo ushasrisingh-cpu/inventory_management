@@ -3,7 +3,7 @@ name: CD - Deploy to ECS
 on:
   workflow_run:
     workflows:
-      - CI
+      - Terraform infrastructure
     branches:
       - master
     types:
@@ -11,6 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   id-token: write
 
@@ -31,11 +32,12 @@ jobs:
   deploy:
     name: Build and deploy to ECS
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     if: >-
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'master') ||
+       github.event.workflow_run.head_branch == 'master' &&
+       github.event.workflow_run.event == 'push') ||
       (github.event_name == 'workflow_dispatch' &&
        github.ref == 'refs/heads/master')
     steps:
@@ -43,6 +45,37 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Confirm CI succeeded for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 40); do
+            result="$(gh run list \
+              --workflow ci.yml \
+              --commit "$IMAGE_TAG" \
+              --limit 1 \
+              --json status,conclusion \
+              --jq 'if length == 0 then "missing" else "\(.[0].status) \(.[0].conclusion)" end')"
+
+            case "$result" in
+              "completed success")
+                echo "CI succeeded for $IMAGE_TAG."
+                exit 0
+                ;;
+              "completed "*)
+                echo "CI did not succeed for $IMAGE_TAG: $result" >&2
+                exit 1
+                ;;
+              *)
+                echo "Waiting for CI for $IMAGE_TAG: $result"
+                sleep 15
+                ;;
+            esac
+          done
+
+          echo "Timed out waiting for successful CI for $IMAGE_TAG." >&2
+          exit 1
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -82,8 +115,16 @@ jobs:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           image="$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          docker build --tag "$image" .
-          docker push "$image"
+
+          if aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "Image $image already exists; reusing immutable tag."
+          else
+            docker build --tag "$image" .
+            docker push "$image"
+          fi
+
           echo "uri=$image" >> "$GITHUB_OUTPUT"
 
       - name: Download ECS task definition
