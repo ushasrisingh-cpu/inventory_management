@@ -47,6 +47,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Confirm CI succeeded for this commit
+        id: ci
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -55,23 +56,22 @@ jobs:
               --workflow ci.yml \
               --commit "$IMAGE_TAG" \
               --limit 1 \
-              --json status,conclusion \
-              --jq 'if length == 0 then "missing" else "\(.[0].status) \(.[0].conclusion)" end')"
+              --json databaseId,status,conclusion \
+              --jq 'if length == 0 then "missing" else "\(.[0].databaseId) \(.[0].status) \(.[0].conclusion)" end')"
 
-            case "$result" in
-              "completed success")
-                echo "CI succeeded for $IMAGE_TAG."
-                exit 0
-                ;;
-              "completed "*)
-                echo "CI did not succeed for $IMAGE_TAG: $result" >&2
-                exit 1
-                ;;
-              *)
-                echo "Waiting for CI for $IMAGE_TAG: $result"
-                sleep 15
-                ;;
-            esac
+            read -r run_id status conclusion <<< "$result"
+            if [ "$status" = "completed" ] && [ "$conclusion" = "success" ]; then
+              echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+              echo "CI succeeded for $IMAGE_TAG."
+              exit 0
+            fi
+            if [ "$status" = "completed" ]; then
+              echo "CI did not succeed for $IMAGE_TAG: $result" >&2
+              exit 1
+            fi
+
+            echo "Waiting for CI for $IMAGE_TAG: $result"
+            sleep 15
           done
 
           echo "Timed out waiting for successful CI for $IMAGE_TAG." >&2
@@ -86,49 +86,85 @@ jobs:
       - name: Check whether development infrastructure is online
         id: infrastructure
         run: |
-          service_status="$(aws ecs describe-services \
+          service_json="$(aws ecs describe-services \
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_SERVICE" \
-            --query 'services[0].status' \
-            --output text 2>/dev/null || true)"
+            --query 'services[0].{status:status,running:runningCount,taskDefinition:taskDefinition}' \
+            --output json 2>/dev/null || true)"
+          service_status="$(jq -r '.status // empty' <<< "$service_json")"
+          running_count="$(jq -r '.running // 0' <<< "$service_json")"
+          task_definition="$(jq -r '.taskDefinition // empty' <<< "$service_json")"
           repository_uri="$(aws ecr describe-repositories \
             --repository-names "$ECR_REPOSITORY" \
             --query 'repositories[0].repositoryUri' \
             --output text 2>/dev/null || true)"
 
-          if [ "$service_status" = "ACTIVE" ] && [ -n "$repository_uri" ] && [ "$repository_uri" != "None" ]; then
+          if [ "$service_status" != "ACTIVE" ] || [ -z "$repository_uri" ] || [ "$repository_uri" = "None" ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Development infrastructure is offline; deployment is safely skipped." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          current_image="$(aws ecs describe-task-definition \
+            --task-definition "$task_definition" \
+            --query "taskDefinition.containerDefinitions[?name=='$ECS_CONTAINER_NAME'].image | [0]" \
+            --output text 2>/dev/null || true)"
+
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+          if [[ "$current_image" == *":$IMAGE_TAG" ]] && [[ "$running_count" =~ ^[1-9][0-9]*$ ]]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Commit $IMAGE_TAG is already running; duplicate deployment is skipped." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check whether the immutable ECR image already exists
+        if: steps.infrastructure.outputs.deploy == 'true'
+        id: image-state
+        run: |
+          if aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "Development infrastructure is offline; deployment is safely skipped." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Download the CI-approved image
+        if: steps.infrastructure.outputs.deploy == 'true' && steps.image-state.outputs.exists != 'true'
+        uses: actions/download-artifact@v6
+        with:
+          name: inventory-management-image-${{ env.IMAGE_TAG }}
+          path: ${{ runner.temp }}/container-image
+          run-id: ${{ steps.ci.outputs.run_id }}
+          github-token: ${{ github.token }}
+
       - name: Log in to Amazon ECR
-        if: steps.infrastructure.outputs.exists == 'true'
+        if: steps.infrastructure.outputs.deploy == 'true'
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push image
-        if: steps.infrastructure.outputs.exists == 'true'
+      - name: Publish the CI-approved image
+        if: steps.infrastructure.outputs.deploy == 'true'
         id: image
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           image="$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
-          if aws ecr describe-images \
-            --repository-name "$ECR_REPOSITORY" \
-            --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
+          if [ "${{ steps.image-state.outputs.exists }}" = "true" ]; then
             echo "Image $image already exists; reusing immutable tag."
           else
-            docker build --tag "$image" .
+            docker load --input "$RUNNER_TEMP/container-image/inventory-management-image.tar"
+            docker tag "$ECR_REPOSITORY:$IMAGE_TAG" "$image"
             docker push "$image"
           fi
 
           echo "uri=$image" >> "$GITHUB_OUTPUT"
 
       - name: Download ECS task definition
-        if: steps.infrastructure.outputs.exists == 'true'
+        if: steps.infrastructure.outputs.deploy == 'true'
         run: |
           aws ecs describe-task-definition \
             --task-definition "$ECS_TASK_DEFINITION" \
@@ -136,7 +172,7 @@ jobs:
             --output json > "$RUNNER_TEMP/task-definition.json"
 
       - name: Render task definition with immutable image
-        if: steps.infrastructure.outputs.exists == 'true'
+        if: steps.infrastructure.outputs.deploy == 'true'
         id: task-definition
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
@@ -147,7 +183,7 @@ jobs:
           image: ${{ steps.image.outputs.uri }}
 
       - name: Deploy task definition to ECS
-        if: steps.infrastructure.outputs.exists == 'true'
+        if: steps.infrastructure.outputs.deploy == 'true'
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.task-definition.outputs.task-definition }}
