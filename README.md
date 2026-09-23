@@ -9,7 +9,7 @@
 
 This repository modernizes a Spring Boot inventory management and e-checkout application for Acme Retail Ltd. The solution replaces manual provisioning and deployment with repeatable Terraform, container delivery, GitHub Actions, layered security checks, AWS ECS Fargate, private MySQL on Amazon RDS, and persistent S3 archives.
 
-The final design was deployed and validated in AWS Mumbai (`ap-south-1`). The disposable development environment was removed after testing, while the independent archive bucket retained database backups and exported logs.
+The final design is deployed and validated in AWS Mumbai (`ap-south-1`). Development is a disposable environment, but it can now be recreated through an approved GitHub Actions Terraform workflow. The independent archive bucket retains logs, Terraform state, and database backups across application-environment teardown.
 
 ## Business problems addressed
 
@@ -34,7 +34,7 @@ The existing application supports inventory categories, item search, members, pu
 | Containers | Docker, Amazon ECR, ECS Fargate |
 | Infrastructure | Terraform, AWS VPC, ALB, IAM, KMS, CloudWatch, S3 |
 | CI/CD | GitHub Actions, AWS OIDC, immutable image tags |
-| Security | Gitleaks, Trivy, Checkov, optional Sonar analysis |
+| Security | Gitleaks, Trivy, Checkov, SonarCloud Quality Gate |
 | Local portability | Kubernetes manifests, Kustomize, Kind |
 | Documentation | Markdown, Mermaid, ADRs, PowerPoint |
 
@@ -46,9 +46,9 @@ See [High-level architecture](architecture/high-level-architecture.md) and [AWS 
 
 ## CI and CD summary
 
-CI runs Maven tests and packaging, uploads the JAR, scans Git history with Gitleaks, validates Terraform, scans Terraform and rendered Kubernetes manifests with Checkov, builds the Docker image, and blocks fixable high or critical findings through Trivy. Sonar analysis runs when its token is configured.
+CI runs Maven tests and packaging, uploads the JAR, scans Git history with Gitleaks, validates Terraform, scans Terraform and rendered Kubernetes manifests with Checkov, builds the Docker image, and blocks fixable high or critical findings through Trivy. SonarCloud analysis is enabled and its Quality Gate passed with no new security issues or hotspots in the latest reviewed change.
 
-After successful CI on `master`, CD assumes an AWS role through GitHub OIDC, builds and pushes an image tagged with the commit SHA, renders a new task-definition revision, and waits for ECS service stability. The repository variable `DEV_INFRA_ENABLED` prevents deployments while the disposable dev environment is offline.
+The Terraform infrastructure workflow runs validation, creates a reviewed remote-state plan, waits for protected-environment approval, and applies dev automatically on a `master` push or either dev or prod through manual dispatch. During an empty-environment bootstrap it creates the AWS foundation, publishes the first immutable image, starts ECS, and enables autoscaling. CD then deploys later successful CI revisions to an existing dev service using GitHub OIDC and a commit-SHA image tag. It safely skips if ECS or ECR is absent.
 
 See [CI/CD flow](architecture/cicd-flow.md).
 
@@ -63,7 +63,8 @@ See [CI/CD flow](architecture/cicd-flow.md).
 | Database backup | Fargate dump and S3 upload containers exited with code 0 |
 | Restore test | 8 tables, 4 members, and 8 products restored |
 | Log archive | Application logs and VPC flow logs retained in S3 |
-| Cleanup | Dev Terraform state empty after 50 resources were destroyed |
+| Automated infrastructure | Reviewed dev plan approved and applied through GitHub Actions with OIDC |
+| Current deployment | ECS rollout completed with 1 desired, 1 running, and ALB readiness HTTP 200 |
 
 ## Repository documentation
 
@@ -103,13 +104,13 @@ Use environment variables or ignored local configuration for credentials. Never 
 ## Known limitations
 
 - The disposable dev ALB used HTTP because ACM requires a controlled domain for a trusted public certificate. Production should use a domain, ACM certificate, HTTPS listener, and HTTP redirect.
-- Snyk, OWASP ZAP, Teams notifications, and a mandatory Sonar quality gate remain future improvements.
-- Log archival and portable SQL backup scripts require manual execution. RDS automated backups remain the primary database recovery mechanism.
+- Snyk, OWASP ZAP, Teams notifications, and centralized AWS security services remain future improvements.
+- EventBridge Scheduler runs the portable database backup daily. CloudWatch log archive uploads remain an on-demand operational procedure. RDS automated backups remain the primary database recovery mechanism.
 - Production Terraform was validated but not applied during the cost-conscious capstone exercise.
 
 ## Safe cleanup
 
-The dev and archive stacks use independent Terraform state. Destroy the dev environment when testing ends, keep `DEV_INFRA_ENABLED=false`, and leave the archive stack running while retained evidence is required. The archive bucket uses `force_destroy = false`, versioning, public-access blocking, and lifecycle expiration.
+The dev and archive stacks use independent Terraform state. Destroy dev only through a reviewed Terraform plan; the CD workflow then detects missing infrastructure and skips safely. Leave the archive stack running while retained evidence is required. The archive bucket uses `force_destroy = false`, versioning, public-access blocking, and lifecycle expiration.
 
 ## Repository naming check
 

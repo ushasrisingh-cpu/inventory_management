@@ -6,7 +6,7 @@
 flowchart LR
     Commit[Pull request or master push] --> Tests[Maven tests]
     Tests --> Package[Maven package and JAR artifact]
-    Package --> Sonar[Conditional Sonar analysis]
+    Package --> Sonar[SonarCloud Quality Gate]
     Commit --> Secrets[Gitleaks]
     Commit --> TF[Terraform format and validate]
     TF --> Checkov[Checkov Terraform]
@@ -19,7 +19,12 @@ flowchart LR
     Checkov --> CI
     KCheck --> CI
     Trivy --> CI
-    CI -->|master and dev enabled| OIDC[Assume AWS role with OIDC]
+    Commit --> InfraValidate[Terraform format validate Checkov]
+    InfraValidate --> InfraPlan[Remote state Terraform plan]
+    InfraPlan --> Approval[Protected environment approval]
+    Approval --> InfraApply[Terraform apply]
+    InfraApply -->|First deployment only| Bootstrap[Push first image deploy task enable autoscaling]
+    CI -->|master and ECS ECR exist| OIDC[Assume AWS role with OIDC]
     OIDC --> ECR[Push commit-SHA image]
     ECR --> Render[Render ECS task definition]
     Render --> Deploy[Deploy and wait for stability]
@@ -29,11 +34,11 @@ flowchart LR
 
 Pull requests and pushes to `master` run CI. Maven tests must pass before packaging. The JAR is uploaded as a workflow artifact. Gitleaks scans full Git history. Terraform is formatted, initialized without a backend, and validated for the reusable root and environments. Checkov scans Terraform and rendered Kubernetes overlays. Docker image creation must succeed, and Trivy blocks fixable high or critical image vulnerabilities.
 
-Sonar analysis is present but runs only when its token exists. Because the workflow does not demonstrate mandatory quality-gate enforcement, documentation treats it as conditional.
+SonarCloud analysis is enabled for reviewed changes. The Quality Gate is part of the current delivery evidence and passed with no new security issues or hotspots in the latest reviewed change.
 
 ## CD behavior
 
-The CD workflow starts only after successful CI on `master`, or through an approved manual dispatch on `master`. `DEV_INFRA_ENABLED` must equal `true`; otherwise the job skips. This prevents a successful CI run from trying to deploy into a deliberately destroyed environment.
+The Terraform infrastructure workflow runs automatically for dev on a `master` push and can be dispatched manually for dev or prod. It validates, creates a remote-state plan, publishes the plan summary, and waits for protected-environment approval before apply. CD starts only after successful CI on `master`, or through manual dispatch on `master`. It checks for the ECS service and ECR repository, then skips safely if dev is deliberately destroyed.
 
 The workflow requests short-lived AWS credentials using OIDC, logs in to ECR, tags the image with the source commit SHA, pushes it, downloads the current ECS task definition, replaces the container image, deploys the new revision, and waits for service stability.
 
@@ -43,7 +48,6 @@ ECS deployment circuit-breaker settings and service-stability waiting detect fai
 
 ## Future improvements
 
-- Enforce a Sonar quality gate instead of only running analysis.
 - Add dynamic application security testing with OWASP ZAP.
 - Add Snyk only if it provides value beyond existing dependency and image controls.
 - Add deployment notifications without exposing scan output or secrets.

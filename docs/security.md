@@ -6,7 +6,7 @@
 |---|---|---|
 | Source history | Gitleaks | CI blocking |
 | Application | Maven tests | CI blocking |
-| Code analysis | Sonar analysis | Conditional on token |
+| Code analysis | SonarCloud Quality Gate | Enabled for reviewed changes |
 | Container | Trivy high and critical fixable findings | CI blocking |
 | Infrastructure | Terraform format and validate | CI blocking |
 | Policy | Checkov for Terraform and Kubernetes | CI blocking with documented exceptions |
@@ -35,7 +35,6 @@ ALB, task, and RDS security groups restrict traffic by source security group and
 
 ## Future improvements
 
-- Enforce a Sonar quality gate.
 - Add OWASP ZAP against an approved temporary endpoint.
 - Evaluate Snyk only after comparing overlap with existing controls.
 - Add Security Hub, GuardDuty, AWS Config, and centralized CloudTrail for a production account.

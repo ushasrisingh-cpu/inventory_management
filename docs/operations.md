@@ -16,7 +16,7 @@ CI validates each approved source revision. CD owns deployed task-definition rev
 
 ## Backup operations
 
-RDS automated backups are the primary managed recovery mechanism. The one-off Fargate task produces a portable secondary SQL backup under `backups/<environment>/`. Run it after the target environment exists and verify both container exit codes and the S3 object metadata.
+RDS automated backups are the primary managed recovery mechanism. EventBridge Scheduler starts the one-off Fargate task daily at `02:00 UTC` by default. The task produces a portable secondary SQL backup under `backups/<environment>/`; an operator can also run it on demand. Verify both container exit codes and the S3 object metadata.
 
 ## Log archives
 
@@ -32,4 +32,4 @@ Review GitHub repository access, OIDC trust conditions, deployment-role permissi
 
 ## Environment status
 
-Keep `DEV_INFRA_ENABLED=false` while dev is destroyed. The archive stack may remain active independently. Before recreating dev, review current costs, Terraform plans, CI status, and retained archive requirements.
+When dev is destroyed, CD detects the missing ECS and ECR resources and skips safely. The archive stack remains active independently. Before recreating dev, review the GitHub Actions Terraform plan, approve the protected environment, confirm CI status, and review current costs and archive requirements.

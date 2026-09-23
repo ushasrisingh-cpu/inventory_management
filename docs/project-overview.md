@@ -24,18 +24,18 @@ The work followed the required AI-assisted engineering sequence:
 - Docker packaging and ECR image storage
 - ECS Fargate service behind an Application Load Balancer
 - Private MySQL RDS and Secrets Manager integration
-- GitHub Actions CI and OIDC-based ECS delivery
-- Checkov, Gitleaks, Trivy, and optional Sonar analysis
+- GitHub Actions CI, reviewed Terraform automation, and OIDC-based ECS delivery
+- Checkov, Gitleaks, Trivy, and SonarCloud Quality Gate
 - CPU target-tracking autoscaling
 - CloudWatch application and VPC flow logs
 - Persistent versioned S3 storage for logs and SQL backups
 - Verified SQL restore procedure
-- Cost-conscious teardown that retains backup evidence
+- Scheduled database backups and cost-conscious teardown that retains backup evidence
 
 ## Main outcomes
 
-The application deployed successfully, passed readiness checks, survived load testing without failed requests, scaled out and back in as designed, produced a portable database backup, restored that backup successfully, and retained application and network logs after the dev environment was destroyed.
+The application deployed successfully, passed readiness checks, survived load testing without failed requests, scaled out and back in as designed, produced and restored a portable database backup, and retained application and network logs. The current dev environment was recreated through the approved Terraform workflow, deployed through CI/CD, and verified with a completed ECS rollout and an ALB readiness response of HTTP 200.
 
 ## Scope boundaries
 
-The capstone did not apply the production Terraform environment. It did not configure a public HTTPS endpoint because no controlled domain was available for ACM certificate validation. Snyk, ZAP, Teams notifications, and a mandatory Sonar quality gate remain documented improvements.
+The capstone did not apply the production Terraform environment. It did not configure a public HTTPS endpoint because no controlled domain was available for ACM certificate validation. Snyk, ZAP, Teams notifications, and centralized AWS security services remain documented improvements. SonarCloud is enabled and its Quality Gate is part of the reviewed delivery evidence.

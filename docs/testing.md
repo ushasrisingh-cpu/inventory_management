@@ -14,6 +14,7 @@ Validation covered application build, infrastructure syntax and policy, containe
 | Terraform | Format, init, validate | Root and environments valid |
 | Infrastructure policy | Checkov | 185 passed, 0 failed, 29 skipped |
 | Container security | Trivy | CI gate succeeded |
+| Code quality | SonarCloud Quality Gate | Passed; no new security issues or hotspots |
 | Health | ALB readiness request | HTTP 200 and `UP` |
 | Load | ApacheBench | 7,507 requests, 0 failures, 24.76 requests/second |
 | Autoscaling | CPU load and AWS activity history | 1 to 2 tasks, then 2 to 1 |
@@ -22,7 +23,9 @@ Validation covered application build, infrastructure syntax and policy, containe
 | Database restore | Temporary MySQL 8.4 | 8 tables, 4 members, 8 products |
 | Application log archive | Direct CloudWatch read to compressed S3 object | 5,005-byte object retained |
 | VPC flow archive | Direct CloudWatch read to compressed S3 object | 43,525-byte object retained |
-| Teardown | Terraform destroy and state check | 50 destroyed, dev state empty |
+| Infrastructure automation | GitHub Actions plan, approval, and apply | Reviewed dev plan applied with OIDC credentials |
+| Current deployment | ECS and ALB checks | 1 desired and running task; rollout completed; readiness HTTP 200 |
+| Historical teardown | Terraform destroy and state check | 50 resources destroyed while the independent archive remained |
 
 ## Autoscaling evidence
 
@@ -34,4 +37,4 @@ The first `mysqldump` attempt exposed an RDS privilege constraint. The reviewed 
 
 ## Limitations
 
-The performance test demonstrates behavior for the temporary dev configuration, not a production capacity limit. Production Terraform was validated but not applied. Sonar is conditional, and Snyk and ZAP were not implemented.
+The performance test demonstrates behavior for the temporary dev configuration, not a production capacity limit. Production Terraform is available through the same reviewed workflow but was not applied during the capstone. Snyk and ZAP were not implemented.

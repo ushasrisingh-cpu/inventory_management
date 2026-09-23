@@ -22,10 +22,10 @@ Ushasri D, Group 22, Foundation Capstone
    ALB, ECS Fargate, RDS, Secrets Manager, ECR, CloudWatch, GitHub OIDC, and persistent S3.
 8. **Infrastructure as Code**
    Terraform modules and independent development, production, and archive environments.
-9. **CI pipeline**
-   Maven, Gitleaks, Terraform validation, Checkov, Docker, Trivy, and conditional Sonar analysis.
-10. **CD pipeline**
-    Successful CI trigger, infrastructure guard, OIDC, immutable ECR tag, ECS task revision, and stability check.
+9. **CI pipeline and Quality Gate**
+   Maven, Gitleaks, Terraform validation, Checkov, Docker, Trivy, SonarCloud, and the passing Quality Gate.
+10. **Approved Terraform and CD workflows**
+    Reviewed plan, protected-environment approval, OIDC, first-deployment bootstrap, immutable ECR tag, ECS task revision, and stability check.
 11. **Security design**
     Identity, secrets, networking, scanning, encryption, documented exceptions, and the production HTTPS requirement.
 12. **Autoscaling and performance evidence**
@@ -33,18 +33,18 @@ Ushasri D, Group 22, Foundation Capstone
 13. **Backup, recovery, and log archival**
     Persistent S3, successful Fargate backup, restore results, retention, and evidence after teardown.
 14. **Engineering decisions and trade-offs**
-    ECS instead of EKS, Kubernetes portability, independent archive state, temporary development HTTP, and manual archive operations.
+    ECS instead of EKS, Kubernetes portability, independent archive state, temporary development HTTP, approved infrastructure automation, and scheduled database backup.
 15. **Results and lessons learned**
     Repeatability, automated delivery, layered security, scaling, recovery, retained evidence, and disciplined review of AI-generated artifacts.
 16. **Future improvements and conclusion**
-    Production HTTPS, mandatory quality gate, dynamic testing, scheduled archives, recovery drills, and centralized security monitoring.
+    Production HTTPS, dynamic testing, scheduled log archival, recovery drills, and centralized security monitoring.
 
 ## Demonstration sequence
 
 1. Show the repository specification and documentation structure.
-2. Show the CI jobs and a successful run.
-3. Explain the CD guard while dev is offline.
-4. Show the Terraform architecture and archive separation.
+2. Show the CI jobs, passing SonarCloud Quality Gate, and a successful run.
+3. Show the Terraform plan, protected-environment approval, and apply workflow.
+4. Show the first-deployment bootstrap and CD behavior after infrastructure exists.
 5. Show autoscaling and load-test evidence.
 6. Show the backup object and restore evidence.
 7. Show the empty dev state and retained archive objects.
